@@ -130,7 +130,8 @@ composite_test_vectors = [
     # Complex Array
     [ "complex array", [ True, 0x01, umsgpack.Ext(0x03, b"foo"), 0xff, { 1: False, 2: u"abc" }, b"\x80", [ 1, 2, 3], u"abc" ], b"\x98\xc3\x01\xc7\x03\x03\x66\x6f\x6f\xcc\xff\x82\x01\xc2\x02\xa3\x61\x62\x63\xc4\x01\x80\x93\x01\x02\x03\xa3\x61\x62\x63" ],
     # Complex Map
-    [ "complex map", { 1 : [{1: 2, 3: 4}, {}], 2: 1, 3: [False, u"def"], 4: {0x100000000: u"a", 0xffffffff: u"b"}}, b"\x84\x01\x92\x82\x01\x02\x03\x04\x80\x02\x01\x03\x92\xc2\xa3\x64\x65\x66\x04\x82\xcf\x00\x00\x00\x01\x00\x00\x00\x00\xa1\x61\xce\xff\xff\xff\xff\xa1\x62" ]
+    [ "complex map4", {4: [{0x100000000: u"a"}, {0xffffffff: u"b"}]}, b'\x81\x04\x92\x81\xcf\x00\x00\x00\x01\x00\x00\x00\x00\xa1a\x81\xce\xff\xff\xff\xff\xa1b' ],
+    [ "complex map", { 1 : [{1: 2, 3: 4}, {}], 2: 1, 3: [False, u"def"], 4: [{0x100000000: u"a"}, {0xffffffff: u"b"}]}, b'\x84\x01\x92\x82\x01\x02\x03\x04\x80\x02\x01\x03\x92\xc2\xa3def\x04\x92\x81\xcf\x00\x00\x00\x01\x00\x00\x00\x00\xa1a\x81\xce\xff\xff\xff\xff\xa1b' ]
 ]
 
 pack_exception_test_vectors = [
@@ -240,13 +241,17 @@ class TestUmsgpack(unittest.TestCase):
         for (name, obj, data) in single_test_vectors:
             obj_repr = repr(obj)
             print("\tTesting %s: object %s" % (name, obj_repr if len(obj_repr) < 24 else obj_repr[0:24] + "..."))
-            self.assertEqual(umsgpack.packb(obj), data)
+            packed = umsgpack.packb(obj)
+            self.assertEqual(packed, data)
+            self.assertEqual(umsgpack.unpackb(packed), obj)
 
     def test_pack_composite(self):
         for (name, obj, data) in composite_test_vectors:
             obj_repr = repr(obj)
             print("\tTesting %s: object %s" % (name, obj_repr if len(obj_repr) < 24 else obj_repr[0:24] + "..."))
-            self.assertEqual(umsgpack.packb(obj), data)
+            packed = umsgpack.packb(obj)
+            self.assertEqual(packed, data)
+            self.assertEqual(umsgpack.unpackb(packed), obj)
 
     def test_pack_exceptions(self):
         for (name, obj, exception) in pack_exception_test_vectors:
@@ -341,11 +346,12 @@ class TestUmsgpack(unittest.TestCase):
         # Get a list of global variables from umsgpack module
         exported_vars = list(filter(lambda x: not x.startswith("_"), dir(umsgpack)))
         # Ignore struct, collections, and sys imports
-        exported_vars = list(filter(lambda x: x not in ("struct", "collections", "sys", 'struct_unpack', 'struct_pack', 'accept_subclasses', 'IS_PY3'), exported_vars))
+        exported_vars = list(filter(lambda x: x not in ("struct", "collections", "sys", "accept_subclasses", "xrange"), exported_vars))
 
-        self.assertTrue(len(exported_vars) == len(exported_vars_test_vector))
         for var in exported_vars_test_vector:
             self.assertTrue(var in exported_vars)
+        self.assertEqual(sorted(exported_vars), sorted(exported_vars_test_vector))
+        self.assertTrue(len(exported_vars) == len(exported_vars_test_vector))
 
 if __name__ == '__main__':
     unittest.main()

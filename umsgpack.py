@@ -44,7 +44,8 @@ types.
 License: MIT
 """
 
-version = (1, 6)
+# Changes on 1.6.1 by Fabio Zadrozny: Did a number of performance enhancements.
+version = (1, 6, 1)
 "Module version tuple"
 
 import collections
@@ -52,10 +53,10 @@ import struct
 import sys
 
 
-struct_unpack = struct.unpack
-struct_pack = struct.pack
+_struct_unpack = struct.unpack
+_struct_pack = struct.pack
 
-IS_PY3 = sys.version_info[0] == 3
+_IS_PY3 = sys.version_info[0] == 3
 
 try:
     xrange
@@ -97,10 +98,10 @@ class Ext:
             raise TypeError("ext type out of range")
 
         # Check data is type bytes
-        elif IS_PY3 and not data.__class__ == bytes:
+        elif _IS_PY3 and not data.__class__ == bytes:
             raise TypeError("ext data is not type \'bytes\'")
 
-        elif not IS_PY3 and not data.__class__ == str:
+        elif not _IS_PY3 and not data.__class__ == str:
             raise TypeError("ext data is not type \'str\'")
 
         self.type = type
@@ -211,36 +212,36 @@ go through a slower path checking with 'isinstance', and not only checking __cla
 
 ################################################################################
 
-# You may notice struct_pack("B", x) instead of the simpler chr(x) in the code
+# You may notice _struct_pack("B", x) instead of the simpler chr(x) in the code
 # below. This is to allow for seamless Python 2 and 3 compatibility, as chr(x)
-# has a str return type instead of bytes in Python 3, and struct_pack(...) has
+# has a str return type instead of bytes in Python 3, and _struct_pack(...) has
 # the right return type in both versions.
 
 def _pack_integer(x):
     if x < 0:
         if x >= -32:
-            return struct_pack("b", x)
+            return _struct_pack("b", x)
         elif x >= -2 ** (8 - 1):
-            return b"\xd0" + struct_pack("b", x)
+            return b"\xd0" + _struct_pack("b", x)
         elif x >= -2 ** (16 - 1):
-            return b"\xd1" + struct_pack(">h", x)
+            return b"\xd1" + _struct_pack(">h", x)
         elif x >= -2 ** (32 - 1):
-            return b"\xd2" + struct_pack(">i", x)
+            return b"\xd2" + _struct_pack(">i", x)
         elif x >= -2 ** (64 - 1):
-            return b"\xd3" + struct_pack(">q", x)
+            return b"\xd3" + _struct_pack(">q", x)
         else:
             raise UnsupportedTypeException("huge signed int")
     else:
         if x <= 127:
-            return struct_pack("B", x)
+            return _struct_pack("B", x)
         elif x <= 2 ** 8 - 1:
-            return b"\xcc" + struct_pack("B", x)
+            return b"\xcc" + _struct_pack("B", x)
         elif x <= 2 ** 16 - 1:
-            return b"\xcd" + struct_pack(">H", x)
+            return b"\xcd" + _struct_pack(">H", x)
         elif x <= 2 ** 32 - 1:
-            return b"\xce" + struct_pack(">I", x)
+            return b"\xce" + _struct_pack(">I", x)
         elif x <= 2 ** 64 - 1:
-            return b"\xcf" + struct_pack(">Q", x)
+            return b"\xcf" + _struct_pack(">Q", x)
         else:
             raise UnsupportedTypeException("huge unsigned int")
 
@@ -252,33 +253,33 @@ def _pack_boolean(x):
 
 def _pack_float(x):
     if _float_size == 64:
-        return b"\xcb" + struct_pack(">d", x)
+        return b"\xcb" + _struct_pack(">d", x)
     else:
-        return b"\xca" + struct_pack(">f", x)
+        return b"\xca" + _struct_pack(">f", x)
 
 def _pack_string(x):
     x = x.encode('utf-8')
     sz = len(x)
 
     if sz <= 31:
-        return struct_pack("B", 0xa0 | sz) + x
+        return _struct_pack("B", 0xa0 | sz) + x
     if sz <= 2 ** 8 - 1:
-        return b"\xd9" + struct_pack("B", sz) + x
+        return b"\xd9" + _struct_pack("B", sz) + x
     if sz <= 2 ** 16 - 1:
-        return b"\xda" + struct_pack(">H", sz) + x
+        return b"\xda" + _struct_pack(">H", sz) + x
     if sz <= 2 ** 32 - 1:
-        return b"\xdb" + struct_pack(">I", sz) + x
+        return b"\xdb" + _struct_pack(">I", sz) + x
 
     raise UnsupportedTypeException("huge string")
 
 def _pack_binary(x):
     sz = len(x)
     if sz <= 2 ** 8 - 1:
-        return b"\xc4" + struct_pack("B", sz) + x
+        return b"\xc4" + _struct_pack("B", sz) + x
     if sz <= 2 ** 16 - 1:
-        return b"\xc5" + struct_pack(">H", sz) + x
+        return b"\xc5" + _struct_pack(">H", sz) + x
     if sz <= 2 ** 32 - 1:
-        return b"\xc6" + struct_pack(">I", sz) + x
+        return b"\xc6" + _struct_pack(">I", sz) + x
 
     raise UnsupportedTypeException("huge binary string")
 
@@ -287,11 +288,11 @@ def _pack_oldspec_raw(x):
     sz = len(x)
 
     if sz <= 31:
-        return struct_pack("B", 0xa0 | sz) + x
+        return _struct_pack("B", 0xa0 | sz) + x
     if sz <= 2 ** 16 - 1:
-        return b"\xda" + struct_pack(">H", sz) + x
+        return b"\xda" + _struct_pack(">H", sz) + x
     if sz <= 2 ** 32 - 1:
-        return b"\xdb" + struct_pack(">I", sz) + x
+        return b"\xdb" + _struct_pack(">I", sz) + x
 
     raise UnsupportedTypeException("huge raw string")
 
@@ -299,21 +300,21 @@ def _pack_ext(x):
     sz = len(x.data)
 
     if sz == 1:
-        return b"\xd4" + struct_pack("B", x.type & 0xff) + x.data
+        return b"\xd4" + _struct_pack("B", x.type & 0xff) + x.data
     if sz == 2:
-        return b"\xd5" + struct_pack("B", x.type & 0xff) + x.data
+        return b"\xd5" + _struct_pack("B", x.type & 0xff) + x.data
     if sz == 4:
-        return b"\xd6" + struct_pack("B", x.type & 0xff) + x.data
+        return b"\xd6" + _struct_pack("B", x.type & 0xff) + x.data
     if sz == 8:
-        return b"\xd7" + struct_pack("B", x.type & 0xff) + x.data
+        return b"\xd7" + _struct_pack("B", x.type & 0xff) + x.data
     if sz == 16:
-        return b"\xd8" + struct_pack("B", x.type & 0xff) + x.data
+        return b"\xd8" + _struct_pack("B", x.type & 0xff) + x.data
     if sz <= 2 ** 8 - 1:
-        return b"\xc7" + struct_pack("BB", sz, x.type & 0xff) + x.data
+        return b"\xc7" + _struct_pack("BB", sz, x.type & 0xff) + x.data
     if sz <= 2 ** 16 - 1:
-        return b"\xc8" + struct_pack(">HB", sz, x.type & 0xff) + x.data
+        return b"\xc8" + _struct_pack(">HB", sz, x.type & 0xff) + x.data
     if sz <= 2 ** 32 - 1:
-        return b"\xc9" + struct_pack(">IB", sz, x.type & 0xff) + x.data
+        return b"\xc9" + _struct_pack(">IB", sz, x.type & 0xff) + x.data
 
     raise UnsupportedTypeException("huge ext data")
 
@@ -321,11 +322,11 @@ def _pack_array(x):
     sz = len(x)
 
     if sz <= 15:
-        s = struct_pack("B", 0x90 | sz)
+        s = _struct_pack("B", 0x90 | sz)
     elif sz <= 2 ** 16 - 1:
-        s = b"\xdc" + struct_pack(">H", sz)
+        s = b"\xdc" + _struct_pack(">H", sz)
     elif sz <= 2 ** 32 - 1:
-        s = b"\xdd" + struct_pack(">I", sz)
+        s = b"\xdd" + _struct_pack(">I", sz)
     else:
         raise UnsupportedTypeException("huge array")
 
@@ -338,11 +339,11 @@ def _pack_map3(x):
     sz = len(x)
 
     if sz <= 15:
-        s = struct_pack("B", 0x80 | sz)
+        s = _struct_pack("B", 0x80 | sz)
     elif sz <= 2 ** 16 - 1:
-        s = b"\xde" + struct_pack(">H", sz)
+        s = b"\xde" + _struct_pack(">H", sz)
     elif sz <= 2 ** 32 - 1:
-        s = b"\xdf" + struct_pack(">I", sz)
+        s = b"\xdf" + _struct_pack(">I", sz)
     else:
         raise UnsupportedTypeException("huge array")
 
@@ -356,11 +357,11 @@ def _pack_map2(x):
     sz = len(x)
 
     if sz <= 15:
-        s = struct_pack("B", 0x80 | sz)
+        s = _struct_pack("B", 0x80 | sz)
     elif sz <= 2 ** 16 - 1:
-        s = b"\xde" + struct_pack(">H", sz)
+        s = b"\xde" + _struct_pack(">H", sz)
     elif sz <= 2 ** 32 - 1:
-        s = b"\xdf" + struct_pack(">I", sz)
+        s = b"\xdf" + _struct_pack(">I", sz)
     else:
         raise UnsupportedTypeException("huge array")
 
@@ -558,34 +559,34 @@ def _packb3(x):
 
 def _unpack_integer(code, read_fn):
     if (ord(code) & 0xe0) == 0xe0:
-        return struct_unpack("b", code)[0]
+        return _struct_unpack("b", code)[0]
 
     if code == b'\xd0':
-        return struct_unpack("b", read_fn(1))[0]
+        return _struct_unpack("b", read_fn(1))[0]
 
     if code == b'\xd1':
-        return struct_unpack(">h", read_fn(2))[0]
+        return _struct_unpack(">h", read_fn(2))[0]
 
     if code == b'\xd2':
-        return struct_unpack(">i", read_fn(4))[0]
+        return _struct_unpack(">i", read_fn(4))[0]
 
     if code == b'\xd3':
-        return struct_unpack(">q", read_fn(8))[0]
+        return _struct_unpack(">q", read_fn(8))[0]
 
     if (ord(code) & 0x80) == 0x00:
-        return struct_unpack("B", code)[0]
+        return _struct_unpack("B", code)[0]
 
     if code == b'\xcc':
-        return struct_unpack("B", read_fn(1))[0]
+        return _struct_unpack("B", read_fn(1))[0]
 
     if code == b'\xcd':
-        return struct_unpack(">H", read_fn(2))[0]
+        return _struct_unpack(">H", read_fn(2))[0]
 
     if code == b'\xce':
-        return struct_unpack(">I", read_fn(4))[0]
+        return _struct_unpack(">I", read_fn(4))[0]
 
     if code == b'\xcf':
-        return struct_unpack(">Q", read_fn(8))[0]
+        return _struct_unpack(">Q", read_fn(8))[0]
 
     raise Exception("logic error, not int: 0x%02x" % ord(code))
 
@@ -608,20 +609,20 @@ def _unpack_boolean(code, read_fn):
 
 def _unpack_float(code, read_fn):
     if code == b'\xca':
-        return struct_unpack(">f", read_fn(4))[0]
+        return _struct_unpack(">f", read_fn(4))[0]
     elif code == b'\xcb':
-        return struct_unpack(">d", read_fn(8))[0]
+        return _struct_unpack(">d", read_fn(8))[0]
     raise Exception("logic error, not float: 0x%02x" % ord(code))
 
 def _unpack_string(code, read_fn):
     if (ord(code) & 0xe0) == 0xa0:
         length = ord(code) & ~0xe0
     elif code == b'\xd9':
-        length = struct_unpack("B", read_fn(1))[0]
+        length = _struct_unpack("B", read_fn(1))[0]
     elif code == b'\xda':
-        length = struct_unpack(">H", read_fn(2))[0]
+        length = _struct_unpack(">H", read_fn(2))[0]
     elif code == b'\xdb':
-        length = struct_unpack(">I", read_fn(4))[0]
+        length = _struct_unpack(">I", read_fn(4))[0]
     else:
         raise Exception("logic error, not string: 0x%02x" % ord(code))
 
@@ -637,11 +638,11 @@ def _unpack_string(code, read_fn):
 
 def _unpack_binary(code, read_fn):
     if code == b'\xc4':
-        length = struct_unpack("B", read_fn(1))[0]
+        length = _struct_unpack("B", read_fn(1))[0]
     elif code == b'\xc5':
-        length = struct_unpack(">H", read_fn(2))[0]
+        length = _struct_unpack(">H", read_fn(2))[0]
     elif code == b'\xc6':
-        length = struct_unpack(">I", read_fn(4))[0]
+        length = _struct_unpack(">I", read_fn(4))[0]
     else:
         raise Exception("logic error, not binary: 0x%02x" % ord(code))
 
@@ -659,11 +660,11 @@ def _unpack_ext(code, read_fn):
     elif code == b'\xd8':
         length = 16
     elif code == b'\xc7':
-        length = struct_unpack("B", read_fn(1))[0]
+        length = _struct_unpack("B", read_fn(1))[0]
     elif code == b'\xc8':
-        length = struct_unpack(">H", read_fn(2))[0]
+        length = _struct_unpack(">H", read_fn(2))[0]
     elif code == b'\xc9':
-        length = struct_unpack(">I", read_fn(4))[0]
+        length = _struct_unpack(">I", read_fn(4))[0]
     else:
         raise Exception("logic error, not ext: 0x%02x" % ord(code))
 
@@ -673,9 +674,9 @@ def _unpack_array(code, read_fn):
     if (ord(code) & 0xf0) == 0x90:
         length = (ord(code) & ~0xf0)
     elif code == b'\xdc':
-        length = struct_unpack(">H", read_fn(2))[0]
+        length = _struct_unpack(">H", read_fn(2))[0]
     elif code == b'\xdd':
-        length = struct_unpack(">I", read_fn(4))[0]
+        length = _struct_unpack(">I", read_fn(4))[0]
     else:
         raise Exception("logic error, not array: 0x%02x" % ord(code))
 
@@ -685,9 +686,9 @@ def _unpack_map(code, read_fn):
     if (ord(code) & 0xf0) == 0x80:
         length = (ord(code) & ~0xf0)
     elif code == b'\xde':
-        length = struct_unpack(">H", read_fn(2))[0]
+        length = _struct_unpack(">H", read_fn(2))[0]
     elif code == b'\xdf':
-        length = struct_unpack(">I", read_fn(4))[0]
+        length = _struct_unpack(">I", read_fn(4))[0]
     else:
         raise Exception("logic error, not map: 0x%02x" % ord(code))
 
@@ -708,16 +709,33 @@ def _unpack_map(code, read_fn):
     return d
 
 ########################################
+class _byte_reader(object):
 
-def _byte_reader(s):
-    i = [0]
-    def read_fn(n):
-        if (i[0] + n > len(s)):
+    def __init__(self, s):
+        self.i = 0
+        self.s_len = s.__len__()
+        self.s = s
+
+
+    def __call__(self, n):
+        i = self.i
+        s = self.s
+        if (i + n > self.s_len):
             raise InsufficientDataException()
-        substring = s[i[0]:i[0] + n]
-        i[0] += n
+        substring = s[i:i + n]
+        self.i = i + n
         return substring
-    return read_fn
+
+# The code above should be a bit faster...
+# def _byte_reader(s):
+#     i = [0]
+#     def read_fn(n):
+#         if (i[0] + n > len(s)):
+#             raise InsufficientDataException()
+#         substring = s[i[0]:i[0] + n]
+#         i[0] += n
+#         return substring
+#     return read_fn
 
 def _unpackb(read_fn):
     code = read_fn(1)
@@ -834,16 +852,16 @@ def __init():
     _unpack_dispatch_table = {}
     # Fix uint
     for code in xrange(0, 0x7f + 1):
-        _unpack_dispatch_table[struct_pack("B", code)] = _unpack_integer
+        _unpack_dispatch_table[_struct_pack("B", code)] = _unpack_integer
     # Fix map
     for code in xrange(0x80, 0x8f + 1):
-        _unpack_dispatch_table[struct_pack("B", code)] = _unpack_map
+        _unpack_dispatch_table[_struct_pack("B", code)] = _unpack_map
     # Fix array
     for code in xrange(0x90, 0x9f + 1):
-        _unpack_dispatch_table[struct_pack("B", code)] = _unpack_array
+        _unpack_dispatch_table[_struct_pack("B", code)] = _unpack_array
     # Fix str
     for code in xrange(0xa0, 0xbf + 1):
-        _unpack_dispatch_table[struct_pack("B", code)] = _unpack_string
+        _unpack_dispatch_table[_struct_pack("B", code)] = _unpack_string
     # Nil
     _unpack_dispatch_table[b'\xc0'] = _unpack_nil
     # Reserved
@@ -853,25 +871,25 @@ def __init():
     _unpack_dispatch_table[b'\xc3'] = _unpack_boolean
     # Bin
     for code in xrange(0xc4, 0xc6 + 1):
-        _unpack_dispatch_table[struct_pack("B", code)] = _unpack_binary
+        _unpack_dispatch_table[_struct_pack("B", code)] = _unpack_binary
     # Ext
     for code in xrange(0xc7, 0xc9 + 1):
-        _unpack_dispatch_table[struct_pack("B", code)] = _unpack_ext
+        _unpack_dispatch_table[_struct_pack("B", code)] = _unpack_ext
     # Float
     _unpack_dispatch_table[b'\xca'] = _unpack_float
     _unpack_dispatch_table[b'\xcb'] = _unpack_float
     # Uint
     for code in xrange(0xcc, 0xcf + 1):
-        _unpack_dispatch_table[struct_pack("B", code)] = _unpack_integer
+        _unpack_dispatch_table[_struct_pack("B", code)] = _unpack_integer
     # Int
     for code in xrange(0xd0, 0xd3 + 1):
-        _unpack_dispatch_table[struct_pack("B", code)] = _unpack_integer
+        _unpack_dispatch_table[_struct_pack("B", code)] = _unpack_integer
     # Fixext
     for code in xrange(0xd4, 0xd8 + 1):
-        _unpack_dispatch_table[struct_pack("B", code)] = _unpack_ext
+        _unpack_dispatch_table[_struct_pack("B", code)] = _unpack_ext
     # String
     for code in xrange(0xd9, 0xdb + 1):
-        _unpack_dispatch_table[struct_pack("B", code)] = _unpack_string
+        _unpack_dispatch_table[_struct_pack("B", code)] = _unpack_string
     # Array
     _unpack_dispatch_table[b'\xdc'] = _unpack_array
     _unpack_dispatch_table[b'\xdd'] = _unpack_array
@@ -880,6 +898,6 @@ def __init():
     _unpack_dispatch_table[b'\xdf'] = _unpack_map
     # Negative fixint
     for code in xrange(0xe0, 0xff + 1):
-        _unpack_dispatch_table[struct_pack("B", code)] = _unpack_integer
+        _unpack_dispatch_table[_struct_pack("B", code)] = _unpack_integer
 
 __init()
