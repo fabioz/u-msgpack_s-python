@@ -330,8 +330,9 @@ def _pack_array(x):
     else:
         raise UnsupportedTypeException("huge array")
 
+    local_packb = packb
     for e in x:
-        s += packb(e)
+        s += local_packb(e)
 
     return s
 
@@ -347,9 +348,10 @@ def _pack_map3(x):
     else:
         raise UnsupportedTypeException("huge array")
 
+    local_packb = packb
     for k, v in x.items():
-        s += packb(k)
-        s += packb(v)
+        s += local_packb(k)
+        s += local_packb(v)
 
     return s
 
@@ -365,9 +367,10 @@ def _pack_map2(x):
     else:
         raise UnsupportedTypeException("huge array")
 
+    local_packb = packb
     for k, v in x.iteritems():
-        s += packb(k)
-        s += packb(v)
+        s += local_packb(k)
+        s += local_packb(v)
 
     return s
 
