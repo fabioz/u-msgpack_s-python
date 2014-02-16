@@ -59,6 +59,12 @@ class Test(unittest.TestCase):
         server_handlers[0].send({'from sender': 'with love'})
         wait_for_condition(lambda: len(client_received) > 0)
         self.assertEqual([{'from sender': 'with love'}], client_received)
+        del client_received[:]
+
+        send = [1234, 'ab'] * 8192
+        server_handlers[0].send(send)
+        wait_for_condition(lambda: len(client_received) > 0)
+        self.assertEqual([send], client_received)
 
 
 

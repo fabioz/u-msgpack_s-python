@@ -113,6 +113,7 @@ class UMsgPacker(object):
 
     def pack_obj(self, obj):
         msg = umsgpack.packb(obj)
+        assert len(msg) < sys.maxint, 'Message from object received is too big: %s bytes' % (len(msg),)
         msg_len_in_bytes = struct.pack("<I", len(msg))
         return(msg_len_in_bytes + msg)
 
