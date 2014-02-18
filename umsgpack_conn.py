@@ -72,7 +72,6 @@ class Server(object):
         self.connection_handler_class = connection_handler_class
         self._block = None
         self._shutdown_event = threading.Event()
-        self.timeout = 2
 
     def serve_forever(self, host, port, block=False):
         if self._block is not None:
@@ -130,10 +129,8 @@ class Server(object):
                 if sock is None:
                     break
 
-                timeout = self.timeout
-                if DEBUG:
-                    sys.stderr.write('Selecting on socket with timeout: %s\n' % timeout)
-                fd_sets = select.select([sock], [], [], timeout)
+                # Will block until available (no timeout). If closed returns properly.
+                fd_sets = select.select([sock], [], [])
                 if DEBUG:
                     sys.stderr.write('Select returned: %s\n' % fd_sets[0])
 
