@@ -49,7 +49,7 @@ class Test(unittest.TestCase):
 
         client = umsgpack_conn.Client('127.0.0.1', port, ClientHandler)
 
-        self.assertEqual(len(server_handlers), 1)
+        wait_for_condition(lambda: len(server_handlers) == 1)
 
         client.send('test send')
         wait_for_condition(lambda: len(server_received) > 0)
@@ -66,6 +66,9 @@ class Test(unittest.TestCase):
         wait_for_condition(lambda: len(client_received) > 0)
         self.assertEqual([send], client_received)
 
+        assert server.is_alive()
+        server.shutdown()
+        wait_for_condition(lambda: not server.is_alive())
 
 
 if __name__ == "__main__":

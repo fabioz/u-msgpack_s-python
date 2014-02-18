@@ -24,6 +24,7 @@ Basic usage is:
 '''
 
 import binascii
+import select
 import socket
 import struct
 import sys
@@ -33,9 +34,9 @@ import time
 import umsgpack
 
 
-DEBUG = False
+DEBUG = 0  # > 3 to see actual messages
 BUFFER_SIZE = 1024 * 8
-
+MAX_INT32 = 2147483647  # ((2** 32) -1)
 
 def get_free_port():
     '''
@@ -69,16 +70,28 @@ class Server(object):
         if connection_handler_class is None:
             connection_handler_class = EchoHandler
         self.connection_handler_class = connection_handler_class
-
+        self._block = None
+        self._shutdown_event = threading.Event()
+        self.timeout = 2
 
     def serve_forever(self, host, port, block=False):
+        if self._block is not None:
+            raise AssertionError(
+                'Server already started. Please create new one instead of trying to reuse.')
         if not block:
             self.thread = threading.Thread(target=self._serve_forever, args=(host, port))
             self.thread.setDaemon(True)
             self.thread.start()
         else:
             self._serve_forever(host, port)
+        self._block = block
 
+    def is_alive(self):
+        if self._block is None:
+            return False
+
+
+        return self._sock is not None
 
     def get_port(self):
         '''
@@ -88,6 +101,16 @@ class Server(object):
         wait_for_condition(lambda: hasattr(self, '_sock'), timeout=5.0)
         return self._sock.getsockname()[1]
 
+    def shutdown(self):
+        if DEBUG:
+            sys.stderr.write('Shuting down server.\n')
+        sock = self._sock
+        if sock is not None:
+            self._sock = None
+            try:
+                sock.close()
+            except:
+                import traceback;traceback.print_exc()
 
     def _serve_forever(self, host, port):
         if DEBUG:
@@ -100,20 +123,58 @@ class Server(object):
 
         self._sock = sock
 
-        while True:
-            connection, _client_address = sock.accept()
+        try:
+            while not self._shutdown_event.is_set():
 
-            connection_handler = self.connection_handler_class(connection)
-            connection_handler.start()
+                sock = self._sock
+                if sock is None:
+                    break
 
+                timeout = self.timeout
+                if DEBUG:
+                    sys.stderr.write('Selecting on socket with timeout: %s\n' % timeout)
+                fd_sets = select.select([sock], [], [], timeout)
+                if DEBUG:
+                    sys.stderr.write('Select returned: %s\n' % fd_sets[0])
+
+                if self._shutdown_event.is_set():
+                    break
+
+                sock = self._sock
+                if sock is None:
+                    break
+
+                if fd_sets[0]:
+                    connection, _client_address = sock.accept()
+                    if DEBUG:
+                        sys.stderr.write('Accepted socket.\n')
+
+                    try:
+                        connection_handler = self.connection_handler_class(connection)
+                        connection_handler.start()
+                    except:
+                        import traceback;traceback.print_exc()
+        finally:
+            if DEBUG:
+                sys.stderr.write('Exited _serve_forever.\n')
+            self.shutdown()
 
 
 class UMsgPacker(object):
-
+    '''
+    Helper to pack some object as bytes to the socket.
+    '''
 
     def pack_obj(self, obj):
+        '''
+        Mostly packs the object with umsgpack then adds the size (in bytes) to the front of the msg
+        and returns it to be passed on the socket..
+
+        :param object obj:
+            The object to be packed.
+        '''
         msg = umsgpack.packb(obj)
-        assert len(msg) < sys.maxint, 'Message from object received is too big: %s bytes' % (len(msg),)
+        assert len(msg) < MAX_INT32, 'Message from object received is too big: %s bytes' % (len(msg),)
         msg_len_in_bytes = struct.pack("<I", len(msg))
         return(msg_len_in_bytes + msg)
 
@@ -134,7 +195,6 @@ class Client(UMsgPacker):
             connection_handler = self.connection_handler = connection_handler_class(self._sock)
             connection_handler.start()
 
-
     def send(self, obj):
         self._sock.sendall(self.pack_obj(obj))
 
@@ -150,7 +210,6 @@ class ConnectionHandler(threading.Thread, UMsgPacker):
             connection.settimeout(None)  # No timeout
         except:
             pass
-
 
     def run(self):
 
@@ -170,7 +229,7 @@ class ConnectionHandler(threading.Thread, UMsgPacker):
                 while not data or number_of_bytes == 0 or len(data) < number_of_bytes:
 
                     rec = self.connection.recv(BUFFER_SIZE)
-                    if DEBUG:
+                    if DEBUG > 3:
                         sys.stderr.write('Received: %s\n' % binascii.b2a_hex(rec))
 
                     data += rec
@@ -195,20 +254,17 @@ class ConnectionHandler(threading.Thread, UMsgPacker):
                 import traceback;traceback.print_exc()
             raise
 
-
     def _handle_msg(self, msg_as_bytes):
-        if DEBUG:
+        if DEBUG > 3:
             sys.stderr.write('Handling message: %s\n' % binascii.b2a_hex(msg_as_bytes))
         decoded = umsgpack.unpackb(msg_as_bytes)
         self._handle_decoded(decoded)
-
 
     def _handle_decoded(self, decoded):
         pass
 
 
 class EchoHandler(ConnectionHandler):
-
 
     def _handle_decoded(self, decoded):
         sys.stdout.write('%s\n' % (decoded,))
