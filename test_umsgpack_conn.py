@@ -5,7 +5,7 @@ Created on Feb 16, 2014
 '''
 import unittest
 
-from umsgpack_conn import ConnectionHandler, wait_for_condition
+from umsgpack_conn import ConnectionHandler, assert_waited_condition
 import umsgpack_conn
 
 
@@ -49,26 +49,26 @@ class Test(unittest.TestCase):
 
         client = umsgpack_conn.Client('127.0.0.1', port, ClientHandler)
 
-        wait_for_condition(lambda: len(server_handlers) == 1)
+        assert_waited_condition(lambda: len(server_handlers) == 1)
 
         client.send('test send')
-        wait_for_condition(lambda: len(server_received) > 0)
+        assert_waited_condition(lambda: len(server_received) > 0)
         self.assertEqual(['test send'], server_received)
         del server_received[:]
 
         server_handlers[0].send({'from sender': 'with love'})
-        wait_for_condition(lambda: len(client_received) > 0)
+        assert_waited_condition(lambda: len(client_received) > 0)
         self.assertEqual([{'from sender': 'with love'}], client_received)
         del client_received[:]
 
         send = [1234, 'ab'] * 8192
         server_handlers[0].send(send)
-        wait_for_condition(lambda: len(client_received) > 0)
+        assert_waited_condition(lambda: len(client_received) > 0)
         self.assertEqual([send], client_received)
 
         assert server.is_alive()
         server.shutdown()
-        wait_for_condition(lambda: not server.is_alive())
+        assert_waited_condition(lambda: not server.is_alive())
 
 
 if __name__ == "__main__":

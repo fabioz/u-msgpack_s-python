@@ -55,6 +55,23 @@ def wait_for_condition(condition, timeout=2.):
     Helper to wait for a condition with a timeout.
     :param float condition:
         Timeout to reach condition (in seconds).
+
+    :return bool:
+        True if the condition wasn't satisfied and True if it was.
+    '''
+    initial = time.time()
+    while not condition():
+        if time.time() - initial > timeout:
+            return False
+        time.sleep(.01)
+    return True
+
+
+def assert_waited_condition(condition, timeout=2.):
+    '''
+    Helper to wait for a condition with a timeout.
+    :param float condition:
+        Timeout to reach condition (in seconds).
     '''
     initial = time.time()
     while not condition():
@@ -66,10 +83,11 @@ def wait_for_condition(condition, timeout=2.):
 
 class Server(object):
 
-    def __init__(self, connection_handler_class=None):
+    def __init__(self, connection_handler_class=None, params=()):
         if connection_handler_class is None:
             connection_handler_class = EchoHandler
         self.connection_handler_class = connection_handler_class
+        self._params = params
         self._block = None
         self._shutdown_event = threading.Event()
 
@@ -153,7 +171,7 @@ class Server(object):
                         sys.stderr.write('Accepted socket.\n')
 
                     try:
-                        connection_handler = self.connection_handler_class(connection)
+                        connection_handler = self.connection_handler_class(connection, *self._params)
                         connection_handler.start()
                     except:
                         import traceback;traceback.print_exc()
@@ -231,9 +249,11 @@ class ConnectionHandler(threading.Thread, UMsgPacker):
 
                 while not data or number_of_bytes == 0 or len(data) < number_of_bytes:
 
+                    if DEBUG > 3:
+                        sys.stderr.write('%s waiting to receive.\n' % (self,))
                     rec = self.connection.recv(BUFFER_SIZE)
                     if DEBUG > 3:
-                        sys.stderr.write('Received: %s\n' % binascii.b2a_hex(rec))
+                        sys.stderr.write('%s received: %s\n' % (self, binascii.b2a_hex(rec)))
 
                     data += rec
                     if not number_of_bytes and len(data) >= 4:
@@ -259,7 +279,7 @@ class ConnectionHandler(threading.Thread, UMsgPacker):
 
     def _handle_msg(self, msg_as_bytes):
         if DEBUG > 3:
-            sys.stderr.write('Handling message: %s\n' % binascii.b2a_hex(msg_as_bytes))
+            sys.stderr.write('%s handling message: %s\n' % (self, binascii.b2a_hex(msg_as_bytes)))
         decoded = umsgpack.unpackb(msg_as_bytes)
         self._handle_decoded(decoded)
 
