@@ -119,6 +119,10 @@ class Server(object):
 
         # Create a TCP/IP socket
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+
+        # We should cleanly call shutdown, but just in case let's set to reuse the address.
+        sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+
         sock.bind((host, port))
         sock.listen(5)  # Request queue size
 
