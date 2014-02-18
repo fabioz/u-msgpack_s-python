@@ -89,8 +89,8 @@ class Server(object):
         if self._block is None:
             return False
 
-
-        return self._sock is not None
+        sock = getattr(self, '_sock', None)
+        return sock is not None
 
     def get_port(self):
         '''
@@ -102,8 +102,10 @@ class Server(object):
 
     def shutdown(self):
         if DEBUG:
-            sys.stderr.write('Shuting down server.\n')
-        sock = self._sock
+            sys.stderr.write('Shutting down server.\n')
+
+        self._shutdown_event.set()
+        sock = getattr(self, '_sock', None)
         if sock is not None:
             self._sock = None
             try:
