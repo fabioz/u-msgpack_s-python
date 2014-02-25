@@ -1,6 +1,7 @@
 This is a fork from https://github.com/vsergeev/u-msgpack-python which should be faster.
 
-Mostly, it's the same thing but with several optimizations to make the code run faster on pure Python.
+Mostly, several optimizations were done to make the code run faster on pure Python (but a bit less
+flexible -- see below).
 
 Additionally, a basic client/server structure is provided in umsgpack_conn.
 
@@ -8,6 +9,13 @@ See: https://github.com/vsergeev/u-msgpack-python for documentation on how to us
 check the docstrigs and __main__ of umsgpack_conn to see how to use the client/server.
 
 Note that umsgpack.py can be used standalone and umsgpack_conn.py just requires umsgpack.py.
+
+Changes from the original version:
+
+- The compatibility mode from u-msgpack-python has been removed.
+
+- Subclasses from raw types aren't accepted (the types must be a basic type
+  such int, long, float, str, and not a subclass).
 
 ## License
 
