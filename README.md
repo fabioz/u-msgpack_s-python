@@ -1,7 +1,7 @@
-This is a fork from https://github.com/vsergeev/u-msgpack-python which should be faster.
+This is a fork from https://github.com/vsergeev/u-msgpack-python.
 
-Mostly, several optimizations were done to make the code run faster on pure Python (but a bit less
-flexible -- see below).
+Mostly, several optimizations were done in this fork to make the code run faster on pure Python
+(but a bit less flexible -- see below).
 
 Additionally, a basic client/server structure is provided in umsgpack_conn.
 
