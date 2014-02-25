@@ -2,9 +2,9 @@ from distutils.core import setup
 
 setup(
     name='u-msgpack-python',
-    version='1.6',
+    version='1.6.1',
     description='A portable, lightweight msgpack serializer and deserializer written in pure Python.',
-    author='vsergeev',
+    author='vsergeev, fabioz',
     author_email='vsergeev at gmail',
     url='https://github.com/vsergeev/u-msgpack-python',
     py_modules=['umsgpack'],

@@ -7,10 +7,12 @@
 #   $ pypy test_umsgpack.py
 #
 
-import umsgpack
-import sys
 import struct
+import sys
 import unittest
+
+import umsgpack
+
 
 single_test_vectors = [
     # None
@@ -61,7 +63,7 @@ single_test_vectors = [
     # 64-bit float
     [ "64-bit float", 0.0, b"\xcb" + b"\x00\x00\x00\x00" + b"\x00\x00\x00\x00" ],
     [ "64-bit float", 2.5, b"\xcb" + b"\x40\x04\x00\x00" + b"\x00\x00\x00\x00" ],
-    [ "64-bit float", float(10**35), b"\xcb" + b"\x47\x33\x42\x61" + b"\x72\xc7\x4d\x82" ],
+    [ "64-bit float", float(10 ** 35), b"\xcb" + b"\x47\x33\x42\x61" + b"\x72\xc7\x4d\x82" ],
     # Fixstr String
     [ "fix string", u"", b"\xa0" ],
     [ "fix string", u"a", b"\xa1\x61" ],
@@ -113,29 +115,30 @@ composite_test_vectors = [
     # Fix Array
     [ "fix array", [ 5, u"abc", True ], b"\x93\x05\xa3\x61\x62\x63\xc3" ],
     # 16-bit Array
-    [ "16-bit array", [ 0x05 ]*16, b"\xdc\x00\x10" + b"\x05"*16 ],
-    [ "16-bit array", [ 0x05 ]*65535, b"\xdc\xff\xff" + b"\x05"*65535 ],
+    [ "16-bit array", [ 0x05 ] * 16, b"\xdc\x00\x10" + b"\x05"*16 ],
+    [ "16-bit array", [ 0x05 ] * 65535, b"\xdc\xff\xff" + b"\x05"*65535 ],
     # 32-bit Array
-    [ "16-bit array", [ 0x05 ]*65536, b"\xdd\x00\x01\x00\x00" + b"\x05"*65536 ],
+    [ "16-bit array", [ 0x05 ] * 65536, b"\xdd\x00\x01\x00\x00" + b"\x05"*65536 ],
     # Fix Map
     [ "fix map", { 1: True, 2: u"abc", 3: b"\x80" }, b"\x83\x01\xc3\x02\xa3\x61\x62\x63\x03\xc4\x01\x80" ],
     [ "fix map", { u"abc" : 5 }, b"\x81\xa3\x61\x62\x63\x05" ],
     [ "fix map", { b"\x80" : 0xffff }, b"\x81\xc4\x01\x80\xcd\xff\xff" ],
     [ "fix map", { True : None }, b"\x81\xc3\xc0" ],
     # 16-bit Map
-    [ "16-bit map", dict([(k, 0x05) for k in range(16)]), b"\xde\x00\x10" + b"".join( [ struct.pack("B", i) + b"\x05" for i in range(16) ] ) ],
+    [ "16-bit map", dict([(k, 0x05) for k in range(16)]), b"\xde\x00\x10" + b"".join([ struct.pack("B", i) + b"\x05" for i in range(16) ]) ],
     [ "16-bit map", dict([(k, 0x05) for k in range(6000)]), b"\xde\x17\x70" + b"".join([ struct.pack("B", i) + b"\x05" for i in range(128)]) + b"".join([ b"\xcc" + struct.pack("B", i) + b"\x05" for i in range(128, 256)]) + b"".join([ b"\xcd" + struct.pack(">H", i) + b"\x05" for i in range(256, 6000)]) ],
     # Complex Array
     [ "complex array", [ True, 0x01, umsgpack.Ext(0x03, b"foo"), 0xff, { 1: False, 2: u"abc" }, b"\x80", [ 1, 2, 3], u"abc" ], b"\x98\xc3\x01\xc7\x03\x03\x66\x6f\x6f\xcc\xff\x82\x01\xc2\x02\xa3\x61\x62\x63\xc4\x01\x80\x93\x01\x02\x03\xa3\x61\x62\x63" ],
     # Complex Map
-    [ "complex map", { 1 : [{1: 2, 3: 4}, {}], 2: 1, 3: [False, u"def"], 4: {0x100000000: u"a", 0xffffffff: u"b"}}, b"\x84\x01\x92\x82\x01\x02\x03\x04\x80\x02\x01\x03\x92\xc2\xa3\x64\x65\x66\x04\x82\xcf\x00\x00\x00\x01\x00\x00\x00\x00\xa1\x61\xce\xff\xff\xff\xff\xa1\x62" ]
+    [ "complex map4", {4: [{0x100000000: u"a"}, {0xffffffff: u"b"}]}, b'\x81\x04\x92\x81\xcf\x00\x00\x00\x01\x00\x00\x00\x00\xa1a\x81\xce\xff\xff\xff\xff\xa1b' ],
+    [ "complex map", { 1 : [{1: 2, 3: 4}, {}], 2: 1, 3: [False, u"def"], 4: [{0x100000000: u"a"}, {0xffffffff: u"b"}]}, b'\x84\x01\x92\x82\x01\x02\x03\x04\x80\x02\x01\x03\x92\xc2\xa3def\x04\x92\x81\xcf\x00\x00\x00\x01\x00\x00\x00\x00\xa1a\x81\xce\xff\xff\xff\xff\xa1b' ]
 ]
 
 pack_exception_test_vectors = [
     # Unsupported type exception
-    [ "unsupported type", set([1,2,3]), umsgpack.UnsupportedTypeException ],
-    [ "unsupported type", -2**(64-1)-1, umsgpack.UnsupportedTypeException ],
-    [ "unsupported type", 2**64, umsgpack.UnsupportedTypeException ],
+    [ "unsupported type", set([1, 2, 3]), umsgpack.UnsupportedTypeException ],
+    [ "unsupported type", -2 ** (64 - 1) - 1, umsgpack.UnsupportedTypeException ],
+    [ "unsupported type", 2 ** 64, umsgpack.UnsupportedTypeException ],
 ]
 
 unpack_exception_test_vectors = [
@@ -238,13 +241,17 @@ class TestUmsgpack(unittest.TestCase):
         for (name, obj, data) in single_test_vectors:
             obj_repr = repr(obj)
             print("\tTesting %s: object %s" % (name, obj_repr if len(obj_repr) < 24 else obj_repr[0:24] + "..."))
-            self.assertEqual(umsgpack.packb(obj), data)
+            packed = umsgpack.packb(obj)
+            self.assertEqual(packed, data)
+            self.assertEqual(umsgpack.unpackb(packed), obj)
 
     def test_pack_composite(self):
         for (name, obj, data) in composite_test_vectors:
             obj_repr = repr(obj)
             print("\tTesting %s: object %s" % (name, obj_repr if len(obj_repr) < 24 else obj_repr[0:24] + "..."))
-            self.assertEqual(umsgpack.packb(obj), data)
+            packed = umsgpack.packb(obj)
+            self.assertEqual(packed, data)
+            self.assertEqual(umsgpack.unpackb(packed), obj)
 
     def test_pack_exceptions(self):
         for (name, obj, exception) in pack_exception_test_vectors:
@@ -339,11 +346,12 @@ class TestUmsgpack(unittest.TestCase):
         # Get a list of global variables from umsgpack module
         exported_vars = list(filter(lambda x: not x.startswith("_"), dir(umsgpack)))
         # Ignore struct, collections, and sys imports
-        exported_vars = list(filter(lambda x: x != "struct" and x != "collections" and x != "sys", exported_vars))
+        exported_vars = list(filter(lambda x: x not in ("struct", "collections", "sys", "accept_subclasses", "xrange"), exported_vars))
 
-        self.assertTrue(len(exported_vars) == len(exported_vars_test_vector))
         for var in exported_vars_test_vector:
             self.assertTrue(var in exported_vars)
+        self.assertEqual(sorted(exported_vars), sorted(exported_vars_test_vector))
+        self.assertTrue(len(exported_vars) == len(exported_vars_test_vector))
 
 if __name__ == '__main__':
     unittest.main()

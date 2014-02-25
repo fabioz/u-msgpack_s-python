@@ -1,3 +1,7 @@
+* Version 1.6.1
+	* Several performance changes were done so it should run faster on pure Python.
+	* A client/server structure is now provided on umsgpack_conn.
+
 * Version 1.6
     * Fix wide character unicode string serialization. Thanks to cforger for the bug report and fix (https://github.com/vsergeev/u-msgpack-python/issues/8).
     * Add module docstrings.
