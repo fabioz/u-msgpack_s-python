@@ -184,168 +184,214 @@ KeyDuplicateException = DuplicateKeyException
 # has a str return type instead of bytes in Python 3, and _struct_pack(...) has
 # the right return type in both versions.
 
-def _pack_integer(x):
+def _pack_integer(x, write):
     if x < 0:
         if x >= -32:
-            return _struct_pack("b", x)
+            write(_struct_pack("b", x))
         elif x >= -2 ** (8 - 1):
-            return b"\xd0" + _struct_pack("b", x)
+            write(b"\xd0")
+            write(_struct_pack("b", x))
         elif x >= -2 ** (16 - 1):
-            return b"\xd1" + _struct_pack(">h", x)
+            write(b"\xd1")
+            write(_struct_pack(">h", x))
         elif x >= -2 ** (32 - 1):
-            return b"\xd2" + _struct_pack(">i", x)
+            write(b"\xd2")
+            write(_struct_pack(">i", x))
         elif x >= -2 ** (64 - 1):
-            return b"\xd3" + _struct_pack(">q", x)
+            write(b"\xd3")
+            write(_struct_pack(">q", x))
         else:
             raise UnsupportedTypeException("huge signed int")
     else:
         if x <= 127:
-            return _struct_pack("B", x)
+            write(_struct_pack("B", x))
         elif x <= 2 ** 8 - 1:
-            return b"\xcc" + _struct_pack("B", x)
+            write(b"\xcc")
+            write(_struct_pack("B", x))
         elif x <= 2 ** 16 - 1:
-            return b"\xcd" + _struct_pack(">H", x)
+            write(b"\xcd")
+            write(_struct_pack(">H", x))
         elif x <= 2 ** 32 - 1:
-            return b"\xce" + _struct_pack(">I", x)
+            write(b"\xce")
+            write(_struct_pack(">I", x))
         elif x <= 2 ** 64 - 1:
-            return b"\xcf" + _struct_pack(">Q", x)
+            write(b"\xcf")
+            write(_struct_pack(">Q", x))
         else:
             raise UnsupportedTypeException("huge unsigned int")
 
-def _pack_nil(x):
-    return b"\xc0"
+def _pack_nil(x, write):
+    write(b"\xc0")
 
-def _pack_boolean(x):
-    return b"\xc3" if x else b"\xc2"
+def _pack_boolean(x, write):
+    write(b"\xc3" if x else b"\xc2")
 
 # Auto-detect system float precision
 if sys.float_info.mant_dig == 53:
     _float_size = 64
 
-    def _pack_float(x):
-        return b"\xcb" + _struct_pack(">d", x)
+    def _pack_float(x, write):
+        write(b"\xcb")
+        write(_struct_pack(">d", x))
 else:
     _float_size = 32
 
-    def _pack_float(x):
-        return b"\xca" + _struct_pack(">f", x)
+    def _pack_float(x, write):
+        write(b"\xca")
+        write(_struct_pack(">f", x))
 
-def _pack_string(x):
+def _pack_string(x, write):
     x = x.encode('utf-8')
     sz = len(x)
 
     if sz <= 31:
-        return _struct_pack("B", 0xa0 | sz) + x
-    if sz <= 2 ** 8 - 1:
-        return b"\xd9" + _struct_pack("B", sz) + x
-    if sz <= 2 ** 16 - 1:
-        return b"\xda" + _struct_pack(">H", sz) + x
-    if sz <= 2 ** 32 - 1:
-        return b"\xdb" + _struct_pack(">I", sz) + x
+        write(_struct_pack("B", 0xa0 | sz))
+        write(x)
+    elif sz <= 2 ** 8 - 1:
+        write(b"\xd9")
+        write(_struct_pack("B", sz))
+        write(x)
+    elif sz <= 2 ** 16 - 1:
+        write(b"\xda")
+        write(_struct_pack(">H", sz))
+        write(x)
+    elif sz <= 2 ** 32 - 1:
+        write(b"\xdb")
+        write(_struct_pack(">I", sz))
+        write(x)
+    else:
+        raise UnsupportedTypeException("huge string")
 
-    raise UnsupportedTypeException("huge string")
-
-def _pack_binary(x):
+def _pack_binary(x, write):
     sz = len(x)
     if sz <= 2 ** 8 - 1:
-        return b"\xc4" + _struct_pack("B", sz) + x
-    if sz <= 2 ** 16 - 1:
-        return b"\xc5" + _struct_pack(">H", sz) + x
-    if sz <= 2 ** 32 - 1:
-        return b"\xc6" + _struct_pack(">I", sz) + x
+        write(b"\xc4")
+        write(_struct_pack("B", sz))
+        write(x)
+    elif sz <= 2 ** 16 - 1:
+        write(b"\xc5")
+        write(_struct_pack(">H", sz))
+        write(x)
+    elif sz <= 2 ** 32 - 1:
+        write(b"\xc6")
+        write(_struct_pack(">I", sz))
+        write(x)
+    else:
+        raise UnsupportedTypeException("huge binary string")
 
-    raise UnsupportedTypeException("huge binary string")
 
-def _pack_oldspec_raw(x):
-
-    sz = len(x)
-
-    if sz <= 31:
-        return _struct_pack("B", 0xa0 | sz) + x
-    if sz <= 2 ** 16 - 1:
-        return b"\xda" + _struct_pack(">H", sz) + x
-    if sz <= 2 ** 32 - 1:
-        return b"\xdb" + _struct_pack(">I", sz) + x
-
-    raise UnsupportedTypeException("huge raw string")
-
-def _pack_ext(x):
+def _pack_ext(x, write):
     sz = len(x.data)
 
     if sz == 1:
-        return b"\xd4" + _struct_pack("B", x.type & 0xff) + x.data
-    if sz == 2:
-        return b"\xd5" + _struct_pack("B", x.type & 0xff) + x.data
-    if sz == 4:
-        return b"\xd6" + _struct_pack("B", x.type & 0xff) + x.data
-    if sz == 8:
-        return b"\xd7" + _struct_pack("B", x.type & 0xff) + x.data
-    if sz == 16:
-        return b"\xd8" + _struct_pack("B", x.type & 0xff) + x.data
-    if sz <= 2 ** 8 - 1:
-        return b"\xc7" + _struct_pack("BB", sz, x.type & 0xff) + x.data
-    if sz <= 2 ** 16 - 1:
-        return b"\xc8" + _struct_pack(">HB", sz, x.type & 0xff) + x.data
-    if sz <= 2 ** 32 - 1:
-        return b"\xc9" + _struct_pack(">IB", sz, x.type & 0xff) + x.data
+        write(b"\xd4")
+        write(_struct_pack("B", x.type & 0xff))
+        write(x.data)
+    elif sz == 2:
+        write(b"\xd5")
+        write(_struct_pack("B", x.type & 0xff))
+        write(x.data)
+    elif sz == 4:
+        write(b"\xd6")
+        write(_struct_pack("B", x.type & 0xff))
+        write(x.data)
+    elif sz == 8:
+        write(b"\xd7")
+        write(_struct_pack("B", x.type & 0xff))
+        write(x.data)
+    elif sz == 16:
+        write(b"\xd8")
+        write(_struct_pack("B", x.type & 0xff))
+        write(x.data)
+    elif sz <= 2 ** 8 - 1:
+        write(b"\xc7")
+        write(_struct_pack("BB", sz, x.type & 0xff))
+        write(x.data)
+    elif sz <= 2 ** 16 - 1:
+        write(b"\xc8")
+        write(_struct_pack(">HB", sz, x.type & 0xff))
+        write(x.data)
+    elif sz <= 2 ** 32 - 1:
+        write(b"\xc9")
+        write(_struct_pack(">IB", sz, x.type & 0xff))
+        write(x.data)
+    else:
+        raise UnsupportedTypeException("huge ext data")
 
-    raise UnsupportedTypeException("huge ext data")
-
-def _pack_array(x):
+def _pack_array(x, write):
     sz = len(x)
 
     if sz <= 15:
-        s = _struct_pack("B", 0x90 | sz)
+        write(_struct_pack("B", 0x90 | sz))
     elif sz <= 2 ** 16 - 1:
-        s = b"\xdc" + _struct_pack(">H", sz)
+        write(b"\xdc")
+        write(_struct_pack(">H", sz))
     elif sz <= 2 ** 32 - 1:
-        s = b"\xdd" + _struct_pack(">I", sz)
+        write(b"\xdd")
+        write(_struct_pack(">I", sz))
     else:
         raise UnsupportedTypeException("huge array")
 
-    local_packb = packb
+    get = _pack_dispatch.__getitem__
     for e in x:
-        s += local_packb(e)
+        get(e.__class__)(e, write)
 
-    return s
-
-def _pack_map3(x):
+def _pack_array_(x, write):
     sz = len(x)
 
     if sz <= 15:
-        s = _struct_pack("B", 0x80 | sz)
+        write(_struct_pack("B", 0x90 | sz))
     elif sz <= 2 ** 16 - 1:
-        s = b"\xde" + _struct_pack(">H", sz)
+        write(b"\xdc")
+        write(_struct_pack(">H", sz))
     elif sz <= 2 ** 32 - 1:
-        s = b"\xdf" + _struct_pack(">I", sz)
+        write(b"\xdd")
+        write(_struct_pack(">I", sz))
     else:
         raise UnsupportedTypeException("huge array")
 
-    local_packb = packb
+    get = _pack_dispatch.__getitem__
+    for e in x:
+        get(e.__class__)(e, write)
+
+
+def _pack_map3(x, write):
+    sz = len(x)
+
+    if sz <= 15:
+        write(_struct_pack("B", 0x80 | sz))
+    elif sz <= 2 ** 16 - 1:
+        write(b"\xde")
+        write(_struct_pack(">H", sz))
+    elif sz <= 2 ** 32 - 1:
+        write(b"\xdf")
+        write(_struct_pack(">I", sz))
+    else:
+        raise UnsupportedTypeException("huge array")
+
+    get = _pack_dispatch.__getitem__
     for k, v in x.items():
-        s += local_packb(k)
-        s += local_packb(v)
+        get(k.__class__)(k, write)
+        get(v.__class__)(v, write)
 
-    return s
-
-def _pack_map2(x):
+def _pack_map2(x, write):
     sz = len(x)
 
     if sz <= 15:
-        s = _struct_pack("B", 0x80 | sz)
+        write(_struct_pack("B", 0x80 | sz))
     elif sz <= 2 ** 16 - 1:
-        s = b"\xde" + _struct_pack(">H", sz)
+        write(b"\xde")
+        write(_struct_pack(">H", sz))
     elif sz <= 2 ** 32 - 1:
-        s = b"\xdf" + _struct_pack(">I", sz)
+        write(b"\xdf")
+        write(_struct_pack(">I", sz))
     else:
         raise UnsupportedTypeException("huge array")
 
-    local_packb = packb
+    get = _pack_dispatch.__getitem__
     for k, v in x.iteritems():
-        s += local_packb(k)
-        s += local_packb(v)
-
-    return s
+        get(k.__class__)(k, write)
+        get(v.__class__)(v, write)
 
 
 def packb(x):
@@ -363,14 +409,22 @@ def packb(x):
             Object type not supported for packing.
 
     Example:
-    >>> umsgpack.packb({u"compact": True, u"schema": 0})
+    >>> umsgpack._packb({u"compact": True, u"schema": 0})
     '\x82\xa7compact\xc3\xa6schema\x00'
     >>>
     """
+
+    # This is slower on py2.7 and 3.3 (on windows)
+    # b = _BytesIO()
+    # _packb(x, b.write)
+    # return b.getvalue()
+
+    lst = []
     try:
-        return _pack_dispatch[x.__class__](x)
-    except:
+        _pack_dispatch[x.__class__](x, lst.append)
+    except KeyError:
         raise UnsupportedTypeException("unsupported type: %s, %r" % (str(type(x)), x))
+    return b''.join(lst)
 
 
 

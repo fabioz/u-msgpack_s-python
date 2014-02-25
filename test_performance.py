@@ -111,6 +111,7 @@ def test_pack_single():
             self.mod = mod
             self.vectors = create_vectors(mod)
             self.times = {}
+            self.big_array = list(range(1000))
 
         def check_pack(self):
             for vec in self.vectors:
@@ -120,9 +121,13 @@ def test_pack_single():
             for vec in self.vectors:
                 self.mod.unpackb(vec[2])
 
+        def check_big_arr(self):
+            self.mod.packb(self.big_array)
+
         def check_all(self):
-            self.times['check_pack'] = timeit.timeit(self.check_pack, number=1000)
-            self.times['check_unpack'] = timeit.timeit(self.check_unpack, number=1000)
+            self.times['check_pack'] = timeit.timeit(self.check_pack, number=2000)
+            self.times['check_unpack'] = timeit.timeit(self.check_unpack, number=2000)
+            self.times['check_big_arr'] = timeit.timeit(self.check_big_arr, number=2000)
 
     try:
         import _original_umsgpack
@@ -137,11 +142,13 @@ def test_pack_single():
     checker_new.check_all()
 
 
+    checker_original.check_all()
+    checker_new.check_all()
 
     sys.stderr.write('Times (note: smaller ratio is better)\n')
     for key, new in sorted(checker_new.times.items()):
         old = checker_original.times[key]
-        sys.stderr.write('old time: %.4f new time: %.4f ratio: %.4f\n' % (old, new, new / old))
+        sys.stderr.write('%s: old time: %.4f new time: %.4f ratio: %.4f\n' % (key, old, new, new / old))
 
 
 

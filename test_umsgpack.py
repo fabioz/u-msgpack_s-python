@@ -259,7 +259,7 @@ class TestUmsgpack(unittest.TestCase):
             try:
                 umsgpack.packb(obj)
             except Exception as e:
-                self.assertTrue(isinstance(e, exception))
+                self.assertTrue(isinstance(e, exception), 'Expected exception: %s. Received: %s' % (exception, e))
 
     def test_unpack_single(self):
         for (name, obj, data) in single_test_vectors:
