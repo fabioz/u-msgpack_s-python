@@ -1,7 +1,6 @@
 '''
-Created on Feb 16, 2014
-
-@author: Fabio
+@license: MIT
+@author: Fabio Zadrozny
 '''
 import unittest
 

@@ -126,14 +126,14 @@ class Ext:
         String representation of this Ext object.
         """
         s = "Ext Object (Type: 0x%02x, Data: " % self.type
-        for i in xrange(min(len(self.data), 8)):
+        for i in xrange(min(self.data.__len__(), 8)):
             if i > 0:
                 s += " "
             if isinstance(self.data[i], int):
                 s += "%02x" % (self.data[i])
             else:
                 s += "%02x" % ord(self.data[i])
-        if len(self.data) > 8:
+        if self.data.__len__() > 8:
             s += " ..."
         s += ")"
         return s
@@ -259,7 +259,7 @@ def _pack_float(x):
 
 def _pack_string(x):
     x = x.encode('utf-8')
-    sz = len(x)
+    sz = x.__len__()
 
     if sz <= 31:
         return _struct_pack("B", 0xa0 | sz) + x
@@ -273,7 +273,7 @@ def _pack_string(x):
     raise UnsupportedTypeException("huge string")
 
 def _pack_binary(x):
-    sz = len(x)
+    sz = x.__len__()
     if sz <= 2 ** 8 - 1:
         return b"\xc4" + _struct_pack("B", sz) + x
     if sz <= 2 ** 16 - 1:
@@ -285,7 +285,7 @@ def _pack_binary(x):
 
 def _pack_oldspec_raw(x):
 
-    sz = len(x)
+    sz = x.__len__()
 
     if sz <= 31:
         return _struct_pack("B", 0xa0 | sz) + x
@@ -297,7 +297,7 @@ def _pack_oldspec_raw(x):
     raise UnsupportedTypeException("huge raw string")
 
 def _pack_ext(x):
-    sz = len(x.data)
+    sz = x.data.__len__()
 
     if sz == 1:
         return b"\xd4" + _struct_pack("B", x.type & 0xff) + x.data
@@ -319,7 +319,7 @@ def _pack_ext(x):
     raise UnsupportedTypeException("huge ext data")
 
 def _pack_array(x):
-    sz = len(x)
+    sz = x.__len__()
 
     if sz <= 15:
         s = _struct_pack("B", 0x90 | sz)
@@ -337,7 +337,7 @@ def _pack_array(x):
     return s
 
 def _pack_map3(x):
-    sz = len(x)
+    sz = x.__len__()
 
     if sz <= 15:
         s = _struct_pack("B", 0x80 | sz)
@@ -356,7 +356,7 @@ def _pack_map3(x):
     return s
 
 def _pack_map2(x):
-    sz = len(x)
+    sz = x.__len__()
 
     if sz <= 15:
         s = _struct_pack("B", 0x80 | sz)
@@ -733,7 +733,7 @@ class _byte_reader(object):
 # def _byte_reader(s):
 #     i = [0]
 #     def read_fn(n):
-#         if (i[0] + n > len(s)):
+#         if (i[0] + n > s.__len__()):
 #             raise InsufficientDataException()
 #         substring = s[i[0]:i[0] + n]
 #         i[0] += n

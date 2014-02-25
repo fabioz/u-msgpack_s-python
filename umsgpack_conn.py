@@ -4,23 +4,44 @@ This module provides a way to do full-duplex communication over a socket with um
 
 Basic usage is:
 
-    # Create our handler to do
+    # Create our server handler (must handle decoded messages)
+
     class ServerHandler(ConnectionHandler, UMsgPacker):
 
         def _handle_decoded(self, decoded):
             # Some message was received from the client in the server.
-            print('Received: ', decoded)
+            if decoded == 'echo':
+                # Actual implementations may want to put that in a queue and have an additional
+                # thread to check the queue and handle what was received and send the results back.
+                self.send('echo back')
 
         def send(self, obj):
-            # Send a message to the client (optional: send is not needed if not full-duplex).
+            # Send a message to the client
             self.connection.sendall(self.pack_obj(obj))
 
 
     # Start the server
     server = umsgpack_conn.Server(ServerHandler)
     server.serve_forever('127.0.0.1', 0, block=True)
-    port = server.get_free_port() # Port only available after socket is created
+    port = server.get_port() # Port only available after socket is created
 
+    ...
+
+    On the client side:
+
+    class ClientHandler(ConnectionHandler, UMsgPacker):
+
+        def _handle_decoded(self, decoded):
+            print('Client received: %s' % (decoded,))
+
+    client = umsgpack_conn.Client('127.0.0.1', port, ClientHandler)
+
+    # Note, as above, actual implementations may want to put that in a queue and have an additional
+    # thread do the actual send.
+    client.send('echo')
+
+@license: MIT
+@author: Fabio Zadrozny
 '''
 
 import binascii
@@ -195,8 +216,8 @@ class UMsgPacker(object):
             The object to be packed.
         '''
         msg = umsgpack.packb(obj)
-        assert len(msg) < MAX_INT32, 'Message from object received is too big: %s bytes' % (len(msg),)
-        msg_len_in_bytes = struct.pack("<I", len(msg))
+        assert msg.__len__() < MAX_INT32, 'Message from object received is too big: %s bytes' % (msg.__len__(),)
+        msg_len_in_bytes = struct.pack("<I", msg.__len__())
         return(msg_len_in_bytes + msg)
 
 
@@ -236,18 +257,17 @@ class ConnectionHandler(threading.Thread, UMsgPacker):
 
         data = ''
         number_of_bytes = 0
-
         try:
             while True:
                 # I.e.: check if the remaining bytes from our last recv already contained a new message.
-                if number_of_bytes == 0 and len(data) >= 4:
+                if number_of_bytes == 0 and data.__len__() >= 4:
                     number_of_bytes = data[:4]  # first 4 bytes say the number_of_bytes of the message
                     number_of_bytes = struct.unpack("<I", number_of_bytes)[0]
                     assert number_of_bytes >= 0, 'Error: wrong message received. Shutting down connection!'
                     data = data[4:]  # The remaining is the actual data
 
 
-                while not data or number_of_bytes == 0 or len(data) < number_of_bytes:
+                while not data or number_of_bytes == 0 or data.__len__() < number_of_bytes:
 
                     if DEBUG > 3:
                         sys.stderr.write('%s waiting to receive.\n' % (self,))
@@ -264,14 +284,14 @@ class ConnectionHandler(threading.Thread, UMsgPacker):
                         sys.stderr.write('%s received: %s\n' % (self, binascii.b2a_hex(rec)))
 
                     data += rec
-                    if not number_of_bytes and len(data) >= 4:
+                    if not number_of_bytes and data.__len__() >= 4:
                         number_of_bytes = data[:4]  # first 4 bytes say the number_of_bytes of the message
                         number_of_bytes = struct.unpack("<I", number_of_bytes)[0]
                         assert number_of_bytes >= 0, 'Error: wrong message received. Shutting down connection!'
                         data = data[4:]  # The remaining is the actual data
                         if DEBUG:
                             sys.stderr.write('Number of bytes expected: %s\n' % number_of_bytes)
-                            sys.stderr.write('Current data len: %s\n' % len(data))
+                            sys.stderr.write('Current data len: %s\n' % data.__len__())
 
                 msg = data[:number_of_bytes]
                 data = data[number_of_bytes:]  # Keep the remaining for the next message
@@ -299,3 +319,43 @@ class EchoHandler(ConnectionHandler):
     def _handle_decoded(self, decoded):
         sys.stdout.write('%s\n' % (decoded,))
 
+
+
+if __name__ == '__main__':
+    # Simple example of client-server.
+
+    class ServerHandler(ConnectionHandler, UMsgPacker):
+
+        def _handle_decoded(self, decoded):
+            # Some message was received from the client in the server.
+            if decoded == 'echo':
+                # Actual implementations may want to put that in a queue and have an additional
+                # thread to check the queue and handle what was received and send the results back.
+                self.send('echo back')
+
+        def send(self, obj):
+            # Send a message to the client
+            self.connection.sendall(self.pack_obj(obj))
+
+
+    # Start the server
+    server = Server(ServerHandler)
+    server.serve_forever('127.0.0.1', 0, block=False)  # Note: not blocking means it'll start in another thread
+
+    time.sleep(2)  # Wait for the other thread to actually start the server.
+
+    port = server.get_port()  # Port only available after socket is created
+
+    received = [False]
+    class ClientHandler(ConnectionHandler, UMsgPacker):
+
+        def _handle_decoded(self, decoded):
+            print('Client received: %s' % (decoded,))
+            received[0] = True
+
+    client = Client('127.0.0.1', port, ClientHandler)
+
+    # Note, as above, actual implementations may want to put that in a queue and have an additional
+    # thread do the actual send.
+    client.send('echo')
+    assert_waited_condition(lambda: received[0])
