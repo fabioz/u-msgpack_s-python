@@ -251,7 +251,15 @@ class ConnectionHandler(threading.Thread, UMsgPacker):
 
                     if DEBUG > 3:
                         sys.stderr.write('%s waiting to receive.\n' % (self,))
-                    rec = self.connection.recv(BUFFER_SIZE)
+
+                    try:
+                        # It's usually waiting here: when the remote side disconnects, that's where we get an exception.
+                        rec = self.connection.recv(BUFFER_SIZE)
+                    except:
+                        if DEBUG:
+                            sys.stderr.write('Disconnected.\n')
+                        return
+
                     if DEBUG > 3:
                         sys.stderr.write('%s received: %s\n' % (self, binascii.b2a_hex(rec)))
 
@@ -270,12 +278,11 @@ class ConnectionHandler(threading.Thread, UMsgPacker):
                 number_of_bytes = 0
                 self._handle_msg(msg)
 
-        except:
+        finally:
             try:
                 self.connection.close()
             except:
-                import traceback;traceback.print_exc()
-            raise
+                pass
 
     def _handle_msg(self, msg_as_bytes):
         if DEBUG > 3:
