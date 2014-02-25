@@ -403,68 +403,49 @@ def _packb2(x):
 
     if x_class == bool:
         return _pack_boolean(x)
-
-    if x_class in (int, long):
+    elif x_class in (int, long):
         return _pack_integer(x)
-
-    if x_class == float:
+    elif x_class == float:
         return _pack_float(x)
-
-    if compatibility:
+    elif compatibility:
         if x_class == unicode:
             return _pack_oldspec_raw(bytes(x))
-
-        if x_class == bytes:
+        elif x_class == bytes:
             return _pack_oldspec_raw(x)
-
-    if x_class == unicode:
+    elif x_class == unicode:
         return _pack_string(x)
-
-    if x_class == str:
+    elif x_class == str:
         return _pack_binary(x)
-
-    if x_class in (list, tuple):
+    elif x_class in (list, tuple):
         return _pack_array(x)
-
-    if x_class == dict:
+    elif x_class == dict:
         return _pack_map2(x)
-
-    if x_class == Ext:
+    elif x_class == Ext:
         return _pack_ext(x)
-
-    if accept_subclasses:  # Go through slower path (and unpacking won't actually get the same type).
+    elif accept_subclasses:  # Go through slower path (and unpacking won't actually get the same type).
         if isinstance(x, bool):
             return _pack_boolean(x)
-
-        if isinstance(x, (int, long)):
+        elif isinstance(x, (int, long)):
             return _pack_integer(x)
-
-        if isinstance(x, float):
+        elif isinstance(x, float):
             return _pack_float(x)
-
-        if compatibility:
+        elif compatibility:
             if isinstance(x, unicode):
                 return _pack_oldspec_raw(bytes(x))
-
-            if isinstance(x, bytes):
+            elif isinstance(x, bytes):
                 return _pack_oldspec_raw(x)
-
-        if isinstance(x, unicode):
+        elif isinstance(x, unicode):
             return _pack_string(x)
-
-        if isinstance(x, str):
+        elif isinstance(x, str):
             return _pack_binary(x)
-
-        if isinstance(x, (list, tuple)):
+        elif isinstance(x, (list, tuple)):
             return _pack_array(x)
-
-        if isinstance(x, dict):
+        elif isinstance(x, dict):
             return _pack_map2(x)
-
-        if isinstance(x, Ext):
+        elif isinstance(x, Ext):
             return _pack_ext(x)
 
-    raise UnsupportedTypeException("unsupported type: %s" % str(type(x)))
+    raise UnsupportedTypeException("unsupported type: %s, %r" % (str(type(x)), x))
 
 # Pack for Python 3, with unicode 'str' type, 'bytes' type, and no 'long' type
 def _packb3(x):
@@ -492,70 +473,49 @@ def _packb3(x):
         return _pack_nil(x)
 
     x_class = x.__class__
-
     if x_class == bool:
         return _pack_boolean(x)
-
-    if x_class == int:
+    elif x_class == int:
         return _pack_integer(x)
-
-    if x_class == float:
+    elif x_class == float:
         return _pack_float(x)
-
-    if compatibility:
+    elif compatibility:
         if x_class == str:
             return _pack_oldspec_raw(x.encode('utf-8'))
-
-        if x_class == bytes:
+        elif x_class == bytes:
             return _pack_oldspec_raw(x)
-
-    if x_class == str:
+    elif x_class == str:
         return _pack_string(x)
-
-    if x_class == bytes:
+    elif x_class == bytes:
         return _pack_binary(x)
-
-    if x_class in (list, tuple):
+    elif x_class in (list, tuple):
         return _pack_array(x)
-
-    if x_class == dict:
+    elif x_class == dict:
         return _pack_map3(x)
-
-    if x_class == Ext:
+    elif x_class == Ext:
         return _pack_ext(x)
-
-    if accept_subclasses:
+    elif accept_subclasses:
         if isinstance(x, bool):
             return _pack_boolean(x)
-
-        if isinstance(x, int):
+        elif isinstance(x, int):
             return _pack_integer(x)
-
-        if isinstance(x, float):
+        elif isinstance(x, float):
             return _pack_float(x)
-
-        if compatibility:
+        elif compatibility:
             if isinstance(x, str):
                 return _pack_oldspec_raw(x.encode('utf-8'))
-
-            if isinstance(x, bytes):
+            elif isinstance(x, bytes):
                 return _pack_oldspec_raw(x)
-
-        if isinstance(x, str):
+        elif isinstance(x, str):
             return _pack_string(x)
-
-        if isinstance(x, bytes):
+        elif isinstance(x, bytes):
             return _pack_binary(x)
-
-        if isinstance(x, (list, tuple)):
+        elif isinstance(x, (list, tuple)):
             return _pack_array(x)
-
-        if isinstance(x, dict):
+        elif isinstance(x, dict):
             return _pack_map3(x)
-
-        if isinstance(x, Ext):
+        elif isinstance(x, Ext):
             return _pack_ext(x)
-
     raise UnsupportedTypeException("unsupported type: %s" % str(type(x)))
 
 ################################################################################
@@ -563,34 +523,24 @@ def _packb3(x):
 def _unpack_integer(code, read_fn):
     if (ord(code) & 0xe0) == 0xe0:
         return _struct_unpack("b", code)[0]
-
-    if code == b'\xd0':
+    elif code == b'\xd0':
         return _struct_unpack("b", read_fn(1))[0]
-
-    if code == b'\xd1':
+    elif code == b'\xd1':
         return _struct_unpack(">h", read_fn(2))[0]
-
-    if code == b'\xd2':
+    elif code == b'\xd2':
         return _struct_unpack(">i", read_fn(4))[0]
-
-    if code == b'\xd3':
+    elif code == b'\xd3':
         return _struct_unpack(">q", read_fn(8))[0]
-
-    if (ord(code) & 0x80) == 0x00:
+    elif (ord(code) & 0x80) == 0x00:
         return _struct_unpack("B", code)[0]
-
-    if code == b'\xcc':
+    elif code == b'\xcc':
         return _struct_unpack("B", read_fn(1))[0]
-
-    if code == b'\xcd':
+    elif code == b'\xcd':
         return _struct_unpack(">H", read_fn(2))[0]
-
-    if code == b'\xce':
+    elif code == b'\xce':
         return _struct_unpack(">I", read_fn(4))[0]
-
-    if code == b'\xcf':
+    elif code == b'\xcf':
         return _struct_unpack(">Q", read_fn(8))[0]
-
     raise Exception("logic error, not int: 0x%02x" % ord(code))
 
 def _unpack_reserved(code, read_fn):
