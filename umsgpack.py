@@ -59,9 +59,9 @@ _struct_pack = struct.pack
 _IS_PY3 = sys.version_info[0] == 3
 
 try:
-    xrange
+    _xrange
 except NameError:
-    xrange = range
+    _xrange = range
 
 ################################################################################
 
@@ -126,14 +126,14 @@ class Ext:
         String representation of this Ext object.
         """
         s = "Ext Object (Type: 0x%02x, Data: " % self.type
-        for i in xrange(min(self.data.__len__(), 8)):
+        for i in _xrange(min(len(self.data), 8)):
             if i > 0:
                 s += " "
             if isinstance(self.data[i], int):
                 s += "%02x" % (self.data[i])
             else:
                 s += "%02x" % ord(self.data[i])
-        if self.data.__len__() > 8:
+        if len(self.data) > 8:
             s += " ..."
         s += ")"
         return s
@@ -179,39 +179,6 @@ KeyDuplicateException = DuplicateKeyException
 
 ################################################################################
 
-# Exported functions and variables set in __init()
-packb = None
-unpackb = None
-dumps = None
-loads = None
-
-compatibility = False
-"""
-Compatibility mode boolean.
-
-When compatibility mode is enabled, u-msgpack-python will serialize both
-unicode strings and bytes into the old "raw" msgpack type, and deserialize the
-"raw" msgpack type into bytes. This provides backwards compatibility with the
-old MessagePack specification.
-
-Example:
->>> umsgpack.compatibility = True
->>>
->>> umsgpack.packb([u"some string", b"some bytes"])
-b'\x92\xabsome string\xaasome bytes'
->>> umsgpack.unpackb(_)
-[b'some string', b'some bytes']
->>>
-"""
-
-accept_subclasses = False
-"""
-Whether we accept subclasses of types when packing (in practice, this means we'll
-go through a slower path checking with 'isinstance', and not only checking __class__).
-"""
-
-################################################################################
-
 # You may notice _struct_pack("B", x) instead of the simpler chr(x) in the code
 # below. This is to allow for seamless Python 2 and 3 compatibility, as chr(x)
 # has a str return type instead of bytes in Python 3, and _struct_pack(...) has
@@ -251,15 +218,21 @@ def _pack_nil(x):
 def _pack_boolean(x):
     return b"\xc3" if x else b"\xc2"
 
-def _pack_float(x):
-    if _float_size == 64:
+# Auto-detect system float precision
+if sys.float_info.mant_dig == 53:
+    _float_size = 64
+
+    def _pack_float(x):
         return b"\xcb" + _struct_pack(">d", x)
-    else:
+else:
+    _float_size = 32
+
+    def _pack_float(x):
         return b"\xca" + _struct_pack(">f", x)
 
 def _pack_string(x):
     x = x.encode('utf-8')
-    sz = x.__len__()
+    sz = len(x)
 
     if sz <= 31:
         return _struct_pack("B", 0xa0 | sz) + x
@@ -273,7 +246,7 @@ def _pack_string(x):
     raise UnsupportedTypeException("huge string")
 
 def _pack_binary(x):
-    sz = x.__len__()
+    sz = len(x)
     if sz <= 2 ** 8 - 1:
         return b"\xc4" + _struct_pack("B", sz) + x
     if sz <= 2 ** 16 - 1:
@@ -285,7 +258,7 @@ def _pack_binary(x):
 
 def _pack_oldspec_raw(x):
 
-    sz = x.__len__()
+    sz = len(x)
 
     if sz <= 31:
         return _struct_pack("B", 0xa0 | sz) + x
@@ -297,7 +270,7 @@ def _pack_oldspec_raw(x):
     raise UnsupportedTypeException("huge raw string")
 
 def _pack_ext(x):
-    sz = x.data.__len__()
+    sz = len(x.data)
 
     if sz == 1:
         return b"\xd4" + _struct_pack("B", x.type & 0xff) + x.data
@@ -319,7 +292,7 @@ def _pack_ext(x):
     raise UnsupportedTypeException("huge ext data")
 
 def _pack_array(x):
-    sz = x.__len__()
+    sz = len(x)
 
     if sz <= 15:
         s = _struct_pack("B", 0x90 | sz)
@@ -337,7 +310,7 @@ def _pack_array(x):
     return s
 
 def _pack_map3(x):
-    sz = x.__len__()
+    sz = len(x)
 
     if sz <= 15:
         s = _struct_pack("B", 0x80 | sz)
@@ -356,7 +329,7 @@ def _pack_map3(x):
     return s
 
 def _pack_map2(x):
-    sz = x.__len__()
+    sz = len(x)
 
     if sz <= 15:
         s = _struct_pack("B", 0x80 | sz)
@@ -374,8 +347,8 @@ def _pack_map2(x):
 
     return s
 
-# Pack for Python 2, with 'unicode' type, 'str' type, and 'long' type
-def _packb2(x):
+
+def packb(x):
     """
     Serialize a Python object into MessagePack bytes.
 
@@ -383,7 +356,7 @@ def _packb2(x):
         x: Python object
 
     Returns:
-        A 'str' containing the serialized bytes.
+        A 'str' or 'bytes' containing the serialized bytes (depending on python version).
 
     Raises:
         UnsupportedType(PackException):
@@ -394,129 +367,12 @@ def _packb2(x):
     '\x82\xa7compact\xc3\xa6schema\x00'
     >>>
     """
-    global compatibility
+    try:
+        return _pack_dispatch[x.__class__](x)
+    except:
+        raise UnsupportedTypeException("unsupported type: %s, %r" % (str(type(x)), x))
 
-    if x is None:
-        return _pack_nil(x)
 
-    x_class = x.__class__
-
-    if x_class == bool:
-        return _pack_boolean(x)
-    elif x_class in (int, long):
-        return _pack_integer(x)
-    elif x_class == float:
-        return _pack_float(x)
-    elif compatibility:
-        if x_class == unicode:
-            return _pack_oldspec_raw(bytes(x))
-        elif x_class == bytes:
-            return _pack_oldspec_raw(x)
-    elif x_class == unicode:
-        return _pack_string(x)
-    elif x_class == str:
-        return _pack_binary(x)
-    elif x_class in (list, tuple):
-        return _pack_array(x)
-    elif x_class == dict:
-        return _pack_map2(x)
-    elif x_class == Ext:
-        return _pack_ext(x)
-    elif accept_subclasses:  # Go through slower path (and unpacking won't actually get the same type).
-        if isinstance(x, bool):
-            return _pack_boolean(x)
-        elif isinstance(x, (int, long)):
-            return _pack_integer(x)
-        elif isinstance(x, float):
-            return _pack_float(x)
-        elif compatibility:
-            if isinstance(x, unicode):
-                return _pack_oldspec_raw(bytes(x))
-            elif isinstance(x, bytes):
-                return _pack_oldspec_raw(x)
-        elif isinstance(x, unicode):
-            return _pack_string(x)
-        elif isinstance(x, str):
-            return _pack_binary(x)
-        elif isinstance(x, (list, tuple)):
-            return _pack_array(x)
-        elif isinstance(x, dict):
-            return _pack_map2(x)
-        elif isinstance(x, Ext):
-            return _pack_ext(x)
-
-    raise UnsupportedTypeException("unsupported type: %s, %r" % (str(type(x)), x))
-
-# Pack for Python 3, with unicode 'str' type, 'bytes' type, and no 'long' type
-def _packb3(x):
-    """
-    Serialize a Python object into MessagePack bytes.
-
-    Args:
-        x: Python object
-
-    Returns:
-        A 'bytes' containing the serialized bytes.
-
-    Raises:
-        UnsupportedType(PackException):
-            Object type not supported for packing.
-
-    Example:
-    >>> umsgpack.packb({u"compact": True, u"schema": 0})
-    b'\x82\xa7compact\xc3\xa6schema\x00'
-    >>>
-    """
-    global compatibility
-
-    if x is None:
-        return _pack_nil(x)
-
-    x_class = x.__class__
-    if x_class == bool:
-        return _pack_boolean(x)
-    elif x_class == int:
-        return _pack_integer(x)
-    elif x_class == float:
-        return _pack_float(x)
-    elif compatibility:
-        if x_class == str:
-            return _pack_oldspec_raw(x.encode('utf-8'))
-        elif x_class == bytes:
-            return _pack_oldspec_raw(x)
-    elif x_class == str:
-        return _pack_string(x)
-    elif x_class == bytes:
-        return _pack_binary(x)
-    elif x_class in (list, tuple):
-        return _pack_array(x)
-    elif x_class == dict:
-        return _pack_map3(x)
-    elif x_class == Ext:
-        return _pack_ext(x)
-    elif accept_subclasses:
-        if isinstance(x, bool):
-            return _pack_boolean(x)
-        elif isinstance(x, int):
-            return _pack_integer(x)
-        elif isinstance(x, float):
-            return _pack_float(x)
-        elif compatibility:
-            if isinstance(x, str):
-                return _pack_oldspec_raw(x.encode('utf-8'))
-            elif isinstance(x, bytes):
-                return _pack_oldspec_raw(x)
-        elif isinstance(x, str):
-            return _pack_string(x)
-        elif isinstance(x, bytes):
-            return _pack_binary(x)
-        elif isinstance(x, (list, tuple)):
-            return _pack_array(x)
-        elif isinstance(x, dict):
-            return _pack_map3(x)
-        elif isinstance(x, Ext):
-            return _pack_ext(x)
-    raise UnsupportedTypeException("unsupported type: %s" % str(type(x)))
 
 ################################################################################
 
@@ -579,11 +435,6 @@ def _unpack_string(code, read_fn):
     else:
         raise Exception("logic error, not string: 0x%02x" % ord(code))
 
-    # Always return raw bytes in compatibility mode
-    global compatibility
-    if compatibility:
-        return read_fn(length)
-
     try:
         return bytes.decode(read_fn(length), 'utf-8')
     except UnicodeDecodeError:
@@ -633,7 +484,7 @@ def _unpack_array(code, read_fn):
     else:
         raise Exception("logic error, not array: 0x%02x" % ord(code))
 
-    return [_unpackb(read_fn) for i in xrange(length)]
+    return [_unpackb(read_fn) for i in _xrange(length)]
 
 def _unpack_map(code, read_fn):
     if (ord(code) & 0xf0) == 0x80:
@@ -646,7 +497,7 @@ def _unpack_map(code, read_fn):
         raise Exception("logic error, not map: 0x%02x" % ord(code))
 
     d = {}
-    for i in xrange(length):
+    for i in _xrange(length):
         # Unpack key
         k = _unpackb(read_fn)
 
@@ -662,45 +513,32 @@ def _unpack_map(code, read_fn):
     return d
 
 ########################################
-class _byte_reader(object):
-
-    def __init__(self, s):
-        self.i = 0
-        self.s_len = s.__len__()
-        self.s = s
-
-
-    def __call__(self, n):
-        i = self.i
-        s = self.s
-        if (i + n > self.s_len):
+def _byte_reader(s):
+    i = [0]
+    def read_fn(n):
+        if (i[0] + n > len(s)):
             raise InsufficientDataException()
-        substring = s[i:i + n]
-        self.i = i + n
+        substring = s[i[0]:i[0] + n]
+        i[0] += n
         return substring
-
-# The code above should be a bit faster...
-# def _byte_reader(s):
-#     i = [0]
-#     def read_fn(n):
-#         if (i[0] + n > s.__len__()):
-#             raise InsufficientDataException()
-#         substring = s[i[0]:i[0] + n]
-#         i[0] += n
-#         return substring
-#     return read_fn
+    return read_fn
 
 def _unpackb(read_fn):
     code = read_fn(1)
     return _unpack_dispatch_table[code](code, read_fn)
 
-# For Python 2, expects a str object
-def _unpackb2(s):
+
+if _IS_PY3:
+    _byte_type = bytes
+else:
+    _byte_type = str
+
+def unpackb(s):
     """
     Deserialize MessagePack bytes into a Python object.
 
     Args:
-        s: a 'str' containing the MessagePack serialized bytes.
+        s: a 'str' containing the MessagePack serialized bytes in Py 2 or 'bytes' in Py3.
 
     Returns:
         A deserialized Python object.
@@ -725,95 +563,36 @@ def _unpackb2(s):
     {u'compact': True, u'schema': 0}
     >>>
     """
-    if not s.__class__ == str:
-        raise TypeError("packed data is not type 'str'")
-
+    if s.__class__ != _byte_type:
+        raise TypeError("packed data is not type '%s'" % (_byte_type,))
     read_fn = _byte_reader(s)
     return _unpackb(read_fn)
 
-# For Python 3, expects a bytes object
-def _unpackb3(s):
-    """
-    Deserialize MessagePack bytes into a Python object.
 
-    Args:
-        s: a 'bytes' containing the MessagePack serialized bytes.
+loads = unpackb
+dumps = packb
 
-    Returns:
-        A deserialized Python object.
+# Dispatch table built in __init for fast lookup of unpacking function.
+_unpack_dispatch_table = {}
 
-    Raises:
-        TypeError:
-            Packed data is not type 'bytes'.
-        InsufficientDataException(UnpackException):
-            Insufficient data to unpack the encoded object.
-        InvalidStringException(UnpackException):
-            Invalid UTF-8 string encountered during unpacking.
-        ReservedCodeException(UnpackException):
-            Reserved code encountered during unpacking.
-        UnhashableKeyException(UnpackException):
-            Unhashable key encountered during map unpacking.
-            The serialized map cannot be deserialized into a Python dictionary.
-        DuplicateKeyException(UnpackException):
-            Duplicate key encountered during map unpacking.
-
-    Example:
-    >>> umsgpack.unpackb(b'\x82\xa7compact\xc3\xa6schema\x00')
-    {'compact': True, 'schema': 0}
-    >>>
-    """
-    if not s.__class__ == bytes:
-        raise TypeError("packed data is not type 'bytes'")
-
-    read_fn = _byte_reader(s)
-    return _unpackb(read_fn)
+# Dispatch table built in __init for fast lookup of packing function.
+_pack_dispatch = {}
 
 ################################################################################
 
 def __init():
-    global packb
-    global unpackb
-    global dumps
-    global loads
-    global compatibility
-    global _float_size
-    global _unpack_dispatch_table
 
-    # Compatibility mode for handling strings/bytes with the old specification
-    compatibility = False
-
-    # Auto-detect system float precision
-    if sys.float_info.mant_dig == 53:
-        _float_size = 64
-    else:
-        _float_size = 32
-
-    # Map packb and unpackb to the appropriate version
-    if sys.version_info[0] == 3:
-        packb = _packb3
-        dumps = _packb3
-        unpackb = _unpackb3
-        loads = _unpackb3
-    else:
-        packb = _packb2
-        dumps = _packb2
-        unpackb = _unpackb2
-        loads = _unpackb2
-
-    # Build a dispatch table for fast lookup of unpacking function
-
-    _unpack_dispatch_table = {}
     # Fix uint
-    for code in xrange(0, 0x7f + 1):
+    for code in _xrange(0, 0x7f + 1):
         _unpack_dispatch_table[_struct_pack("B", code)] = _unpack_integer
     # Fix map
-    for code in xrange(0x80, 0x8f + 1):
+    for code in _xrange(0x80, 0x8f + 1):
         _unpack_dispatch_table[_struct_pack("B", code)] = _unpack_map
     # Fix array
-    for code in xrange(0x90, 0x9f + 1):
+    for code in _xrange(0x90, 0x9f + 1):
         _unpack_dispatch_table[_struct_pack("B", code)] = _unpack_array
     # Fix str
-    for code in xrange(0xa0, 0xbf + 1):
+    for code in _xrange(0xa0, 0xbf + 1):
         _unpack_dispatch_table[_struct_pack("B", code)] = _unpack_string
     # Nil
     _unpack_dispatch_table[b'\xc0'] = _unpack_nil
@@ -823,25 +602,25 @@ def __init():
     _unpack_dispatch_table[b'\xc2'] = _unpack_boolean
     _unpack_dispatch_table[b'\xc3'] = _unpack_boolean
     # Bin
-    for code in xrange(0xc4, 0xc6 + 1):
+    for code in _xrange(0xc4, 0xc6 + 1):
         _unpack_dispatch_table[_struct_pack("B", code)] = _unpack_binary
     # Ext
-    for code in xrange(0xc7, 0xc9 + 1):
+    for code in _xrange(0xc7, 0xc9 + 1):
         _unpack_dispatch_table[_struct_pack("B", code)] = _unpack_ext
     # Float
     _unpack_dispatch_table[b'\xca'] = _unpack_float
     _unpack_dispatch_table[b'\xcb'] = _unpack_float
     # Uint
-    for code in xrange(0xcc, 0xcf + 1):
+    for code in _xrange(0xcc, 0xcf + 1):
         _unpack_dispatch_table[_struct_pack("B", code)] = _unpack_integer
     # Int
-    for code in xrange(0xd0, 0xd3 + 1):
+    for code in _xrange(0xd0, 0xd3 + 1):
         _unpack_dispatch_table[_struct_pack("B", code)] = _unpack_integer
     # Fixext
-    for code in xrange(0xd4, 0xd8 + 1):
+    for code in _xrange(0xd4, 0xd8 + 1):
         _unpack_dispatch_table[_struct_pack("B", code)] = _unpack_ext
     # String
-    for code in xrange(0xd9, 0xdb + 1):
+    for code in _xrange(0xd9, 0xdb + 1):
         _unpack_dispatch_table[_struct_pack("B", code)] = _unpack_string
     # Array
     _unpack_dispatch_table[b'\xdc'] = _unpack_array
@@ -850,7 +629,37 @@ def __init():
     _unpack_dispatch_table[b'\xde'] = _unpack_map
     _unpack_dispatch_table[b'\xdf'] = _unpack_map
     # Negative fixint
-    for code in xrange(0xe0, 0xff + 1):
+    for code in _xrange(0xe0, 0xff + 1):
         _unpack_dispatch_table[_struct_pack("B", code)] = _unpack_integer
+
+    if not _IS_PY3:
+        _pack_dispatch.update({
+            bool: _pack_boolean,
+            int:_pack_integer,
+            long:_pack_integer,
+            float: _pack_float,
+            unicode: _pack_string,
+            str:_pack_binary,
+            list:_pack_array,
+            tuple:_pack_array,
+            dict:_pack_map2,
+            Ext:_pack_ext,
+            None.__class__:_pack_nil
+        })
+
+    else:
+        _pack_dispatch.update({
+            bool: _pack_boolean,
+            int:_pack_integer,
+            float: _pack_float,
+            str:_pack_string,
+            bytes:_pack_binary,
+            list:_pack_array,
+            tuple:_pack_array,
+            dict:_pack_map3,
+            Ext:_pack_ext,
+            None.__class__:_pack_nil
+        })
+
 
 __init()

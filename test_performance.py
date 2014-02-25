@@ -138,8 +138,8 @@ def test_pack_single():
 
 
 
-    sys.stderr.write('Times (note: smaller ratio is better)')
-    for key, new in sorted(checker_new.times.iteritems()):
+    sys.stderr.write('Times (note: smaller ratio is better)\n')
+    for key, new in sorted(checker_new.times.items()):
         old = checker_original.times[key]
         sys.stderr.write('old time: %.4f new time: %.4f ratio: %.4f\n' % (old, new, new / old))
 

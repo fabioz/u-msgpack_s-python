@@ -231,7 +231,6 @@ exported_vars_test_vector = [
     "dumps",
     "loads",
     "version",
-    "compatibility",
 ]
 
 ################################################################################
@@ -296,37 +295,6 @@ class TestUmsgpack(unittest.TestCase):
             except Exception as e:
                 self.assertTrue(isinstance(e, exception))
 
-    def test_pack_compatibility(self):
-        umsgpack.compatibility = True
-
-        for (name, obj, data) in compatibility_test_vectors:
-            obj_repr = repr(obj)
-            print("\tTesting %s: object %s" % (name, obj_repr if len(obj_repr) < 24 else obj_repr[0:24] + "..."))
-            self.assertEqual(umsgpack.packb(obj), data)
-
-        umsgpack.compatibility = False
-
-    def test_unpack_compatibility(self):
-        umsgpack.compatibility = True
-
-        for (name, obj, data) in compatibility_test_vectors:
-            obj_repr = repr(obj)
-            print("\tTesting %s: object %s" % (name, obj_repr if len(obj_repr) < 24 else obj_repr[0:24] + "..."))
-            unpacked = umsgpack.unpackb(data)
-
-            # Encoded raw should always unpack to bytes in compatibility mode,
-            # so convert any string obj to bytes before comparison
-            if sys.version_info[0] == 3 and isinstance(obj, str):
-                _obj = obj.encode('utf-8')
-            elif sys.version_info[0] == 2 and isinstance(obj, unicode):
-                _obj = bytes(obj)
-            else:
-                _obj = obj
-
-            self.assertTrue(isinstance(unpacked, type(_obj)))
-            self.assertEqual(unpacked, _obj)
-
-        umsgpack.compatibility = False
 
     def test_ext_exceptions(self):
         try:
@@ -346,11 +314,12 @@ class TestUmsgpack(unittest.TestCase):
         # Get a list of global variables from umsgpack module
         exported_vars = list(filter(lambda x: not x.startswith("_"), dir(umsgpack)))
         # Ignore struct, collections, and sys imports
-        exported_vars = list(filter(lambda x: x not in ("struct", "collections", "sys", "accept_subclasses", "xrange"), exported_vars))
+        exported_vars = list(filter(lambda x: x not in ("struct", "collections", "sys"), exported_vars))
+        print(exported_vars)
 
+        self.assertEqual(sorted(exported_vars), sorted(exported_vars_test_vector))
         for var in exported_vars_test_vector:
             self.assertTrue(var in exported_vars)
-        self.assertEqual(sorted(exported_vars), sorted(exported_vars_test_vector))
         self.assertTrue(len(exported_vars) == len(exported_vars_test_vector))
 
 if __name__ == '__main__':
