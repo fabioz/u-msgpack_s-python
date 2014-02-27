@@ -339,45 +339,7 @@ def _pack_array(arr, write):
 
     get = _pack_dispatch.__getitem__
     for x in arr:
-        if x.__class__ == (int, long):
-            # Special case for list(int) to be faster (on long lists inlining it has a noticeable
-            # speedup -- up to 30% on my measurements).
-            if x < 0:
-                if x >= -32:
-                    write(_struct_pack("b", x))
-                elif x >= -2 ** (8 - 1):
-                    write(b"\xd0")
-                    write(_struct_pack("b", x))
-                elif x >= -2 ** (16 - 1):
-                    write(b"\xd1")
-                    write(_struct_pack(">h", x))
-                elif x >= -2 ** (32 - 1):
-                    write(b"\xd2")
-                    write(_struct_pack(">i", x))
-                elif x >= -2 ** (64 - 1):
-                    write(b"\xd3")
-                    write(_struct_pack(">q", x))
-                else:
-                    raise UnsupportedTypeException("huge signed int")
-            else:
-                if x <= 127:
-                    write(_struct_pack("B", x))
-                elif x <= 2 ** 8 - 1:
-                    write(b"\xcc")
-                    write(_struct_pack("B", x))
-                elif x <= 2 ** 16 - 1:
-                    write(b"\xcd")
-                    write(_struct_pack(">H", x))
-                elif x <= 2 ** 32 - 1:
-                    write(b"\xce")
-                    write(_struct_pack(">I", x))
-                elif x <= 2 ** 64 - 1:
-                    write(b"\xcf")
-                    write(_struct_pack(">Q", x))
-                else:
-                    raise UnsupportedTypeException("huge unsigned int")
-        else:
-            get(x.__class__)(x, write)
+        get(x.__class__)(x, write)
 
 def _pack_array_(x, write):
     sz = len(x)
@@ -612,8 +574,9 @@ def _unpack_map(code, read_fn):
 ########################################
 def _byte_reader(s):
     i = [0]
+    len_s = len(s)
     def read_fn(n):
-        if (i[0] + n > len(s)):
+        if i[0] + n > len_s:
             raise InsufficientDataException()
         substring = s[i[0]:i[0] + n]
         i[0] += n

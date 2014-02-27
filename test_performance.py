@@ -112,6 +112,8 @@ def test_pack_single():
             self.vectors = create_vectors(mod)
             self.times = {}
             self.big_array = list(range(1000))
+            self.big_array_pack = self.mod.packb(self.big_array)
+            self.big_str_array = ['a'] * 1000
 
         def check_pack(self):
             for vec in self.vectors:
@@ -121,13 +123,21 @@ def test_pack_single():
             for vec in self.vectors:
                 self.mod.unpackb(vec[2])
 
-        def check_big_arr(self):
+        def check_big_int_arr(self):
             self.mod.packb(self.big_array)
+
+        def check_big_str_arr(self):
+            self.mod.packb(self.big_str_array)
+
+        def check_unpack_big_arr(self):
+            self.mod.unpackb(self.big_array_pack)
 
         def check_all(self):
             self.times['check_pack'] = timeit.timeit(self.check_pack, number=2000)
             self.times['check_unpack'] = timeit.timeit(self.check_unpack, number=2000)
-            self.times['check_big_arr'] = timeit.timeit(self.check_big_arr, number=2000)
+            self.times['check_big_int_arr'] = timeit.timeit(self.check_big_int_arr, number=2000)
+            self.times['check_big_str_arr'] = timeit.timeit(self.check_big_str_arr, number=1000)
+            self.times['check_unpack_big_arr'] = timeit.timeit(self.check_unpack_big_arr, number=1000)
 
     try:
         import _original_umsgpack
