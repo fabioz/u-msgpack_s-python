@@ -314,7 +314,7 @@ class TestUmsgpack(unittest.TestCase):
         # Get a list of global variables from umsgpack module
         exported_vars = list(filter(lambda x: not x.startswith("_"), dir(umsgpack)))
         # Ignore struct, collections, and sys imports
-        exported_vars = list(filter(lambda x: x not in ("struct", "collections", "sys"), exported_vars))
+        exported_vars = list(filter(lambda x: x not in ("struct", "collections", "sys", "long"), exported_vars))
         print(exported_vars)
 
         self.assertEqual(sorted(exported_vars), sorted(exported_vars_test_vector))

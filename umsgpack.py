@@ -63,6 +63,11 @@ try:
 except NameError:
     _xrange = range
 
+try:
+    long
+except NameError:
+    long = int
+
 ################################################################################
 
 # Extension type for application-specific types and data
@@ -318,8 +323,8 @@ def _pack_ext(x, write):
     else:
         raise UnsupportedTypeException("huge ext data")
 
-def _pack_array(x, write):
-    sz = len(x)
+def _pack_array(arr, write):
+    sz = len(arr)
 
     if sz <= 15:
         write(_struct_pack("B", 0x90 | sz))
@@ -333,8 +338,46 @@ def _pack_array(x, write):
         raise UnsupportedTypeException("huge array")
 
     get = _pack_dispatch.__getitem__
-    for e in x:
-        get(e.__class__)(e, write)
+    for x in arr:
+        if x.__class__ == (int, long):
+            # Special case for list(int) to be faster (on long lists inlining it has a noticeable
+            # speedup -- up to 30% on my measurements).
+            if x < 0:
+                if x >= -32:
+                    write(_struct_pack("b", x))
+                elif x >= -2 ** (8 - 1):
+                    write(b"\xd0")
+                    write(_struct_pack("b", x))
+                elif x >= -2 ** (16 - 1):
+                    write(b"\xd1")
+                    write(_struct_pack(">h", x))
+                elif x >= -2 ** (32 - 1):
+                    write(b"\xd2")
+                    write(_struct_pack(">i", x))
+                elif x >= -2 ** (64 - 1):
+                    write(b"\xd3")
+                    write(_struct_pack(">q", x))
+                else:
+                    raise UnsupportedTypeException("huge signed int")
+            else:
+                if x <= 127:
+                    write(_struct_pack("B", x))
+                elif x <= 2 ** 8 - 1:
+                    write(b"\xcc")
+                    write(_struct_pack("B", x))
+                elif x <= 2 ** 16 - 1:
+                    write(b"\xcd")
+                    write(_struct_pack(">H", x))
+                elif x <= 2 ** 32 - 1:
+                    write(b"\xce")
+                    write(_struct_pack(">I", x))
+                elif x <= 2 ** 64 - 1:
+                    write(b"\xcf")
+                    write(_struct_pack(">Q", x))
+                else:
+                    raise UnsupportedTypeException("huge unsigned int")
+        else:
+            get(x.__class__)(x, write)
 
 def _pack_array_(x, write):
     sz = len(x)
