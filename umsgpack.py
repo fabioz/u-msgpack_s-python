@@ -63,10 +63,6 @@ try:
 except NameError:
     _xrange = range
 
-try:
-    long
-except NameError:
-    long = int
 
 ################################################################################
 
@@ -360,43 +356,45 @@ def _pack_array_(x, write):
         get(e.__class__)(e, write)
 
 
-def _pack_map3(x, write):
-    sz = len(x)
+if _IS_PY3:
 
-    if sz <= 15:
-        write(_struct_pack("B", 0x80 | sz))
-    elif sz <= 2 ** 16 - 1:
-        write(b"\xde")
-        write(_struct_pack(">H", sz))
-    elif sz <= 2 ** 32 - 1:
-        write(b"\xdf")
-        write(_struct_pack(">I", sz))
-    else:
-        raise UnsupportedTypeException("huge array")
+    def _pack_map(x, write):
+        sz = len(x)
 
-    get = _pack_dispatch.__getitem__
-    for k, v in x.items():
-        get(k.__class__)(k, write)
-        get(v.__class__)(v, write)
+        if sz <= 15:
+            write(_struct_pack("B", 0x80 | sz))
+        elif sz <= 2 ** 16 - 1:
+            write(b"\xde")
+            write(_struct_pack(">H", sz))
+        elif sz <= 2 ** 32 - 1:
+            write(b"\xdf")
+            write(_struct_pack(">I", sz))
+        else:
+            raise UnsupportedTypeException("huge array")
 
-def _pack_map2(x, write):
-    sz = len(x)
+        get = _pack_dispatch.__getitem__
+        for k, v in x.items():
+            get(k.__class__)(k, write)
+            get(v.__class__)(v, write)
+else:
+    def _pack_map(x, write):
+        sz = len(x)
 
-    if sz <= 15:
-        write(_struct_pack("B", 0x80 | sz))
-    elif sz <= 2 ** 16 - 1:
-        write(b"\xde")
-        write(_struct_pack(">H", sz))
-    elif sz <= 2 ** 32 - 1:
-        write(b"\xdf")
-        write(_struct_pack(">I", sz))
-    else:
-        raise UnsupportedTypeException("huge array")
+        if sz <= 15:
+            write(_struct_pack("B", 0x80 | sz))
+        elif sz <= 2 ** 16 - 1:
+            write(b"\xde")
+            write(_struct_pack(">H", sz))
+        elif sz <= 2 ** 32 - 1:
+            write(b"\xdf")
+            write(_struct_pack(">I", sz))
+        else:
+            raise UnsupportedTypeException("huge array")
 
-    get = _pack_dispatch.__getitem__
-    for k, v in x.iteritems():
-        get(k.__class__)(k, write)
-        get(v.__class__)(v, write)
+        get = _pack_dispatch.__getitem__
+        for k, v in x.iteritems():  # The only difference from the PY3 version is iteritems().
+            get(k.__class__)(k, write)
+            get(v.__class__)(v, write)
 
 
 def packb(x):
@@ -543,7 +541,16 @@ def _unpack_array(code, read_fn):
     else:
         raise Exception("logic error, not array: 0x%02x" % ord(code))
 
-    return [_unpackb(read_fn) for i in _xrange(length)]
+
+    # The code below was: return [_unpackb(read_fn) for _i in _xrange(length)]
+    # On Py 2.7 the code below was around 7% faster (mostly inlining some things).
+    ret = []
+    get = _unpack_dispatch_table.__getitem__
+    append = ret.append
+    for _i in _xrange(length):
+        code = read_fn(1)
+        append(get(code)(code, read_fn))
+    return ret
 
 def _unpack_map(code, read_fn):
     if (ord(code) & 0xf0) == 0x80:
@@ -702,7 +709,7 @@ def __init():
             str:_pack_binary,
             list:_pack_array,
             tuple:_pack_array,
-            dict:_pack_map2,
+            dict:_pack_map,
             Ext:_pack_ext,
             None.__class__:_pack_nil
         })
@@ -716,7 +723,7 @@ def __init():
             bytes:_pack_binary,
             list:_pack_array,
             tuple:_pack_array,
-            dict:_pack_map3,
+            dict:_pack_map,
             Ext:_pack_ext,
             None.__class__:_pack_nil
         })
