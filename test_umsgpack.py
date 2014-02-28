@@ -180,11 +180,11 @@ unpack_exception_test_vectors = [
     [ "insufficient data ext 16-bit", b"\xc8\x01\x00\x05\x01\x02\x03", umsgpack.InsufficientDataException ],
     [ "insufficient data ext 32-bit", b"\xc9\x00\x01\x00\x00\x05\x01\x02\x03", umsgpack.InsufficientDataException ],
     # Unhashable key { 1 : False, [1,2,3] : True }
-    [ "unhashable key", b"\x82\x01\xc2\x93\x01\x02\x03\xc3", umsgpack.UnhashableKeyException ],
+    [ "unhashable key", b"\x82\x01\xc2\x93\x01\x02\x03\xc3", TypeError ],
     # Unhashable key { 1 : True, { 1 : 1 } : False }
-    [ "unhashable key", b"\x82\x01\xc3\x81\x01\x01\xc2", umsgpack.UnhashableKeyException ],
+    [ "unhashable key", b"\x82\x01\xc3\x81\x01\x01\xc2", TypeError ],
     # Key duplicate { 1 : True, 1 : False }
-    [ "duplicate key", b"\x82\x01\xc3\x01\xc2", umsgpack.DuplicateKeyException ],
+    # [ "duplicate key", b"\x82\x01\xc3\x01\xc2", umsgpack.DuplicateKeyException ], -- no longer checking for duplicate key.
     # Reserved code (0xc1)
     [ "reserved code", b"\xc1", umsgpack.ReservedCodeException ],
     # Invalid string (non utf-8)

@@ -547,7 +547,8 @@ def _unpack_array(code, read_fn):
     ret = []
     get = _unpack_dispatch_table.__getitem__
     append = ret.append
-    for _i in _xrange(length):
+    while length > 0:
+        length -= 1
         code = read_fn(1)
         append(get(code)(code, read_fn))
     return ret
@@ -562,20 +563,17 @@ def _unpack_map(code, read_fn):
     else:
         raise Exception("logic error, not map: 0x%02x" % ord(code))
 
+    get = _unpack_dispatch_table.__getitem__
+
     d = {}
-    for i in _xrange(length):
-        # Unpack key
-        k = _unpackb(read_fn)
-
-        if not isinstance(k, collections.Hashable):
-            raise UnhashableKeyException("encountered unhashable key type: %s" % str(type(k)))
-        elif k in d:
-            raise DuplicateKeyException("encountered duplicate key: %s, %s" % (str(k), str(type(k))))
-
-        # Unpack value
-        v = _unpackb(read_fn)
-
-        d[k] = v
+    setitem = d.__setitem__
+    while length > 0:
+        length -= 1
+        key_code = read_fn(1)
+        k = get(key_code)(key_code, read_fn)
+        
+        val_code = read_fn(1)
+        setitem(k, get(val_code)(val_code, read_fn))
     return d
 
 ########################################
@@ -583,10 +581,11 @@ def _byte_reader(s):
     i = [0]
     len_s = len(s)
     def read_fn(n):
-        if i[0] + n > len_s:
+        j = i[0]
+        if j + n > len_s:
             raise InsufficientDataException()
-        substring = s[i[0]:i[0] + n]
-        i[0] += n
+        substring = s[j:j + n]
+        i[0] = j + n
         return substring
     return read_fn
 
