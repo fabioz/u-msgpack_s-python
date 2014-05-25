@@ -104,13 +104,14 @@ def assert_waited_condition(condition, timeout=2.):
 
 class Server(object):
 
-    def __init__(self, connection_handler_class=None, params=()):
+    def __init__(self, connection_handler_class=None, params=(), thread_name=''):
         if connection_handler_class is None:
             connection_handler_class = EchoHandler
         self.connection_handler_class = connection_handler_class
         self._params = params
         self._block = None
         self._shutdown_event = threading.Event()
+        self._thread_name = thread_name
 
     def serve_forever(self, host, port, block=False):
         if self._block is not None:
@@ -119,6 +120,8 @@ class Server(object):
         if not block:
             self.thread = threading.Thread(target=self._serve_forever, args=(host, port))
             self.thread.setDaemon(True)
+            if self._thread_name:
+                self.thread.setName(self._thread_name)
             self.thread.start()
         else:
             self._serve_forever(host, port)
