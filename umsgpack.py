@@ -48,7 +48,6 @@ License: MIT
 version = (1, 6, 1)
 "Module version tuple"
 
-import collections
 import struct
 import sys
 
@@ -571,7 +570,7 @@ def _unpack_map(code, read_fn):
         length -= 1
         key_code = read_fn(1)
         k = get(key_code)(key_code, read_fn)
-        
+
         val_code = read_fn(1)
         setitem(k, get(val_code)(val_code, read_fn))
     return d
