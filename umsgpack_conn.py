@@ -53,6 +53,7 @@ import threading
 import time
 
 import umsgpack
+import weakref
 
 
 DEBUG = 0  # > 3 to see actual messages
@@ -151,9 +152,13 @@ class Server(object):
         if sock is not None:
             self._sock = None
             try:
+                sock.shutdown(socket.SHUT_RDWR)
+            except:
+                pass
+            try:
                 sock.close()
             except:
-                import traceback;traceback.print_exc()
+                pass
 
     def _serve_forever(self, host, port):
         if DEBUG:
@@ -169,6 +174,7 @@ class Server(object):
         sock.listen(5)  # Request queue size
 
         self._sock = sock
+        connections = []
 
         try:
             while not self._shutdown_event.is_set():
@@ -196,14 +202,27 @@ class Server(object):
 
                     try:
                         connection_handler = self.connection_handler_class(connection, *self._params)
+                        connections.append(weakref.ref(connection))
                         connection_handler.start()
                     except:
                         import traceback;traceback.print_exc()
         finally:
             if DEBUG:
                 sys.stderr.write('Exited _serve_forever.\n')
-            self.shutdown()
 
+            for c in connections:
+                c = c()
+                if c is not None:
+                    try:
+                        c.shutdown(socket.SHUT_RDWR)
+                    except:
+                        pass
+                    try:
+                        c.close()
+                    except:
+                        pass
+
+            self.shutdown()
 
 class UMsgPacker(object):
     '''
@@ -278,6 +297,10 @@ class ConnectionHandler(threading.Thread, UMsgPacker):
                     try:
                         # It's usually waiting here: when the remote side disconnects, that's where we get an exception.
                         rec = self.connection.recv(BUFFER_SIZE)
+                        if len(rec) == 0:
+                            if DEBUG:
+                                sys.stderr.write('Disconnected (socket closed).\n')
+                            return
                     except:
                         if DEBUG:
                             sys.stderr.write('Disconnected.\n')
@@ -302,6 +325,10 @@ class ConnectionHandler(threading.Thread, UMsgPacker):
                 self._handle_msg(msg)
 
         finally:
+            try:
+                self.connection.shutdown(socket.SHUT_RDWR)
+            except:
+                pass
             try:
                 self.connection.close()
             except:

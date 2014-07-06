@@ -6,6 +6,8 @@ import unittest
 
 from umsgpack_conn import ConnectionHandler, assert_waited_condition
 import umsgpack_conn
+import time
+import threading
 
 
 class Test(unittest.TestCase):
@@ -40,7 +42,7 @@ class Test(unittest.TestCase):
             def _handle_decoded(self, decoded):
                 client_received.append(decoded)
 
-
+        initial_num_threads = self._list_threads()
 
         server = umsgpack_conn.Server(ServerHandler)
         server.serve_forever('127.0.0.1', 0, block=False)
@@ -49,6 +51,9 @@ class Test(unittest.TestCase):
         client = umsgpack_conn.Client('127.0.0.1', port, ClientHandler)
 
         assert_waited_condition(lambda: len(server_handlers) == 1)
+
+        assert_waited_condition(lambda: self._list_threads() == initial_num_threads + 3)
+
 
         client.send('test send')
         assert_waited_condition(lambda: len(server_received) > 0)
@@ -66,8 +71,28 @@ class Test(unittest.TestCase):
         self.assertEqual([send], client_received)
 
         assert server.is_alive()
+
         server.shutdown()
         assert_waited_condition(lambda: not server.is_alive())
+
+        assert_waited_condition(lambda: self._list_threads() == initial_num_threads)
+
+
+    def _list_threads(self, print_=False):
+        total_threads = 0
+        time.sleep(0.1)
+        if print_:
+            print '\n\n----'
+
+        for t in threading.enumerate():
+            if t.isAlive():
+                total_threads += 1
+                if print_:
+                    print t
+
+        if print_:
+            print 'total', total_threads
+        return total_threads
 
 
 if __name__ == "__main__":
