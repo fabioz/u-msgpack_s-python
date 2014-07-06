@@ -58,9 +58,9 @@ _struct_pack = struct.pack
 _IS_PY3 = sys.version_info[0] == 3
 
 try:
-    _xrange
+    xrange
 except NameError:
-    _xrange = range
+    xrange = range  # @ReservedAssignment
 
 
 ################################################################################
@@ -126,7 +126,7 @@ class Ext:
         String representation of this Ext object.
         """
         s = "Ext Object (Type: 0x%02x, Data: " % self.type
-        for i in _xrange(min(len(self.data), 8)):
+        for i in xrange(min(len(self.data), 8)):
             if i > 0:
                 s += " "
             if isinstance(self.data[i], int):
@@ -541,7 +541,7 @@ def _unpack_array(code, read_fn):
         raise Exception("logic error, not array: 0x%02x" % ord(code))
 
 
-    # The code below was: return [_unpackb(read_fn) for _i in _xrange(length)]
+    # The code below was: return [_unpackb(read_fn) for _i in xrange(length)]
     # On Py 2.7 the code below was around 7% faster (mostly inlining some things).
     ret = []
     get = _unpack_dispatch_table.__getitem__
@@ -648,16 +648,16 @@ _pack_dispatch = {}
 def __init():
 
     # Fix uint
-    for code in _xrange(0, 0x7f + 1):
+    for code in xrange(0, 0x7f + 1):
         _unpack_dispatch_table[_struct_pack("B", code)] = _unpack_integer
     # Fix map
-    for code in _xrange(0x80, 0x8f + 1):
+    for code in xrange(0x80, 0x8f + 1):
         _unpack_dispatch_table[_struct_pack("B", code)] = _unpack_map
     # Fix array
-    for code in _xrange(0x90, 0x9f + 1):
+    for code in xrange(0x90, 0x9f + 1):
         _unpack_dispatch_table[_struct_pack("B", code)] = _unpack_array
     # Fix str
-    for code in _xrange(0xa0, 0xbf + 1):
+    for code in xrange(0xa0, 0xbf + 1):
         _unpack_dispatch_table[_struct_pack("B", code)] = _unpack_string
     # Nil
     _unpack_dispatch_table[b'\xc0'] = _unpack_nil
@@ -667,25 +667,25 @@ def __init():
     _unpack_dispatch_table[b'\xc2'] = _unpack_boolean
     _unpack_dispatch_table[b'\xc3'] = _unpack_boolean
     # Bin
-    for code in _xrange(0xc4, 0xc6 + 1):
+    for code in xrange(0xc4, 0xc6 + 1):
         _unpack_dispatch_table[_struct_pack("B", code)] = _unpack_binary
     # Ext
-    for code in _xrange(0xc7, 0xc9 + 1):
+    for code in xrange(0xc7, 0xc9 + 1):
         _unpack_dispatch_table[_struct_pack("B", code)] = _unpack_ext
     # Float
     _unpack_dispatch_table[b'\xca'] = _unpack_float
     _unpack_dispatch_table[b'\xcb'] = _unpack_float
     # Uint
-    for code in _xrange(0xcc, 0xcf + 1):
+    for code in xrange(0xcc, 0xcf + 1):
         _unpack_dispatch_table[_struct_pack("B", code)] = _unpack_integer
     # Int
-    for code in _xrange(0xd0, 0xd3 + 1):
+    for code in xrange(0xd0, 0xd3 + 1):
         _unpack_dispatch_table[_struct_pack("B", code)] = _unpack_integer
     # Fixext
-    for code in _xrange(0xd4, 0xd8 + 1):
+    for code in xrange(0xd4, 0xd8 + 1):
         _unpack_dispatch_table[_struct_pack("B", code)] = _unpack_ext
     # String
-    for code in _xrange(0xd9, 0xdb + 1):
+    for code in xrange(0xd9, 0xdb + 1):
         _unpack_dispatch_table[_struct_pack("B", code)] = _unpack_string
     # Array
     _unpack_dispatch_table[b'\xdc'] = _unpack_array
@@ -694,7 +694,7 @@ def __init():
     _unpack_dispatch_table[b'\xde'] = _unpack_map
     _unpack_dispatch_table[b'\xdf'] = _unpack_map
     # Negative fixint
-    for code in _xrange(0xe0, 0xff + 1):
+    for code in xrange(0xe0, 0xff + 1):
         _unpack_dispatch_table[_struct_pack("B", code)] = _unpack_integer
 
     if not _IS_PY3:
