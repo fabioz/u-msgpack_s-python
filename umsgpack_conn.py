@@ -51,14 +51,18 @@ import struct
 import sys
 import threading
 import time
-
-import umsgpack
 import weakref
 
+try:
+    basestring
+except:
+    basestring = str
 
+import umsgpack
 DEBUG = 0  # > 3 to see actual messages
 BUFFER_SIZE = 1024 * 8
 MAX_INT32 = 2147483647  # ((2** 32) -1)
+
 
 def get_free_port():
     '''
@@ -92,15 +96,32 @@ def wait_for_condition(condition, timeout=2.):
 def assert_waited_condition(condition, timeout=2.):
     '''
     Helper to wait for a condition with a timeout.
+
+    :param callable condition:
+        A callable that returns either a True/False boolean (where True indicates the condition was
+        reached) or a string (where an empty string means the condition was reached or a non-empty
+        string to show some message to the user regarding the failure).
+
     :param float condition:
         Timeout to reach condition (in seconds).
     '''
     initial = time.time()
-    while not condition():
-        if time.time() - initial > timeout:
-            raise AssertionError('Could not reach condition before timeout: %s' % (timeout,))
-        time.sleep(.01)
+    while True:
+        c = condition()
+        if isinstance(c, bool):
+            if c:
+                return
+        elif isinstance(c, basestring):
+            if not c:
+                return
+        else:
+            raise AssertionError('Expecting bool or string as the return.')
 
+        if time.time() - initial > timeout:
+            raise AssertionError(
+                u'Could not reach condition before timeout: %s (condition return: %s)' %
+                (timeout, c))
+        time.sleep(.01)
 
 
 class Server(object):
@@ -201,11 +222,15 @@ class Server(object):
                         sys.stderr.write('Accepted socket.\n')
 
                     try:
-                        connection_handler = self.connection_handler_class(connection, *self._params)
+                        connection_handler = self.connection_handler_class(
+                            connection,
+                            *
+                            self._params)
                         connections.append(weakref.ref(connection))
                         connection_handler.start()
                     except:
-                        import traceback;traceback.print_exc()
+                        import traceback
+                        traceback.print_exc()
         finally:
             if DEBUG:
                 sys.stderr.write('Exited _serve_forever.\n')
@@ -224,7 +249,9 @@ class Server(object):
 
             self.shutdown()
 
+
 class UMsgPacker(object):
+
     '''
     Helper to pack some object as bytes to the socket.
     '''
@@ -238,7 +265,8 @@ class UMsgPacker(object):
             The object to be packed.
         '''
         msg = umsgpack.packb(obj)
-        assert msg.__len__() < MAX_INT32, 'Message from object received is too big: %s bytes' % (msg.__len__(),)
+        assert msg.__len__() < MAX_INT32, 'Message from object received is too big: %s bytes' % (
+            msg.__len__(),)
         msg_len_in_bytes = struct.pack("<I", msg.__len__())
         return(msg_len_in_bytes + msg)
 
@@ -265,7 +293,6 @@ class Client(UMsgPacker):
 
 class ConnectionHandler(threading.Thread, UMsgPacker):
 
-
     def __init__(self, connection):
         threading.Thread.__init__(self)
         self.setDaemon(True)
@@ -281,13 +308,14 @@ class ConnectionHandler(threading.Thread, UMsgPacker):
         number_of_bytes = 0
         try:
             while True:
-                # I.e.: check if the remaining bytes from our last recv already contained a new message.
+                # I.e.: check if the remaining bytes from our last recv already contained
+                # a new message.
                 if number_of_bytes == 0 and data.__len__() >= 4:
-                    number_of_bytes = data[:4]  # first 4 bytes say the number_of_bytes of the message
+                    number_of_bytes = data[
+                        :4]  # first 4 bytes say the number_of_bytes of the message
                     number_of_bytes = struct.unpack("<I", number_of_bytes)[0]
                     assert number_of_bytes >= 0, 'Error: wrong message received. Shutting down connection!'
                     data = data[4:]  # The remaining is the actual data
-
 
                 while not data or number_of_bytes == 0 or data.__len__() < number_of_bytes:
 
@@ -295,7 +323,8 @@ class ConnectionHandler(threading.Thread, UMsgPacker):
                         sys.stderr.write('%s waiting to receive.\n' % (self,))
 
                     try:
-                        # It's usually waiting here: when the remote side disconnects, that's where we get an exception.
+                        # It's usually waiting here: when the remote side disconnects, that's
+                        # where we get an exception.
                         rec = self.connection.recv(BUFFER_SIZE)
                         if len(rec) == 0:
                             if DEBUG:
@@ -311,7 +340,8 @@ class ConnectionHandler(threading.Thread, UMsgPacker):
 
                     data += rec
                     if not number_of_bytes and data.__len__() >= 4:
-                        number_of_bytes = data[:4]  # first 4 bytes say the number_of_bytes of the message
+                        number_of_bytes = data[
+                            :4]  # first 4 bytes say the number_of_bytes of the message
                         number_of_bytes = struct.unpack("<I", number_of_bytes)[0]
                         assert number_of_bytes >= 0, 'Error: wrong message received. Shutting down connection!'
                         data = data[4:]  # The remaining is the actual data
@@ -350,7 +380,6 @@ class EchoHandler(ConnectionHandler):
         sys.stdout.write('%s\n' % (decoded,))
 
 
-
 if __name__ == '__main__':
     # Simple example of client-server.
 
@@ -367,16 +396,17 @@ if __name__ == '__main__':
             # Send a message to the client
             self.connection.sendall(self.pack_obj(obj))
 
-
     # Start the server
     server = Server(ServerHandler)
-    server.serve_forever('127.0.0.1', 0, block=False)  # Note: not blocking means it'll start in another thread
+    # Note: not blocking means it'll start in another thread
+    server.serve_forever('127.0.0.1', 0, block=False)
 
     time.sleep(2)  # Wait for the other thread to actually start the server.
 
     port = server.get_port()  # Port only available after socket is created
 
     received = [False]
+
     class ClientHandler(ConnectionHandler, UMsgPacker):
 
         def _handle_decoded(self, decoded):
