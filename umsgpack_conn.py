@@ -126,7 +126,10 @@ def assert_waited_condition(condition, timeout=2.):
 
 class Server(object):
 
-    def __init__(self, connection_handler_class=None, params=(), thread_name=''):
+    def __init__(self, connection_handler_class=None, params=(), thread_name='', thread_class=None):
+        if thread_class is None:
+            thread_class = threading.Thread
+        self._thread_class = thread_class
         if connection_handler_class is None:
             connection_handler_class = EchoHandler
         self.connection_handler_class = connection_handler_class
@@ -140,7 +143,7 @@ class Server(object):
             raise AssertionError(
                 'Server already started. Please create new one instead of trying to reuse.')
         if not block:
-            self.thread = threading.Thread(target=self._serve_forever, args=(host, port))
+            self.thread = self._thread_class(target=self._serve_forever, args=(host, port))
             self.thread.setDaemon(True)
             if self._thread_name:
                 self.thread.setName(self._thread_name)
@@ -293,8 +296,8 @@ class Client(UMsgPacker):
 
 class ConnectionHandler(threading.Thread, UMsgPacker):
 
-    def __init__(self, connection):
-        threading.Thread.__init__(self)
+    def __init__(self, connection, **kwargs):
+        threading.Thread.__init__(self, **kwargs)
         self.setDaemon(True)
         self.connection = connection
         try:
@@ -303,7 +306,6 @@ class ConnectionHandler(threading.Thread, UMsgPacker):
             pass
 
     def run(self):
-
         data = ''
         number_of_bytes = 0
         try:
