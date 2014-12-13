@@ -59,6 +59,7 @@ except:
     basestring = str
 
 import umsgpack
+as_bytes = umsgpack.as_bytes
 DEBUG = 0  # > 3 to see actual messages
 BUFFER_SIZE = 1024 * 8
 MAX_INT32 = 2147483647  # ((2** 32) -1)
@@ -306,7 +307,7 @@ class ConnectionHandler(threading.Thread, UMsgPacker):
             pass
 
     def run(self):
-        data = ''
+        data = as_bytes('')
         number_of_bytes = 0
         try:
             while True:

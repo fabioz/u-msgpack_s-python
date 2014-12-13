@@ -82,16 +82,16 @@ class Test(unittest.TestCase):
         total_threads = 0
         time.sleep(0.1)
         if print_:
-            print '\n\n----'
+            print('\n\n----')
 
         for t in threading.enumerate():
             if t.isAlive():
                 total_threads += 1
                 if print_:
-                    print t
+                    print(t)
 
         if print_:
-            print 'total', total_threads
+            print('total', total_threads)
         return total_threads
 
 

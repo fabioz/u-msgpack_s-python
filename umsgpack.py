@@ -55,7 +55,8 @@ import sys
 _struct_unpack = struct.unpack
 _struct_pack = struct.pack
 
-_IS_PY3 = sys.version_info[0] == 3
+_PY2 = sys.version_info[0] < 3
+_IS_PY3 = not _PY2
 
 try:
     xrange
@@ -595,8 +596,19 @@ def _unpackb(read_fn):
 
 if _IS_PY3:
     _byte_type = bytes
+    def as_bytes(b):
+        if b.__class__ == str:
+            return b.encode('utf-8')
+        return b
+
 else:
     _byte_type = str
+    
+    def as_bytes(b):
+        if b.__class__ == unicode:
+            return b.encode('utf-8')
+        return b
+
 
 def unpackb(s):
     """
