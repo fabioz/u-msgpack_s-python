@@ -63,6 +63,20 @@ try:
 except NameError:
     xrange = range  # @ReservedAssignment
 
+if _IS_PY3:
+    _byte_type = bytes
+    def _as_bytes(b):
+        if b.__class__ == str:
+            return b.encode('utf-8')
+        return b
+
+else:
+    _byte_type = str
+    
+    def _as_bytes(b):
+        if b.__class__ == unicode:
+            return b.encode('utf-8')
+        return b
 
 ################################################################################
 
@@ -592,22 +606,6 @@ def _byte_reader(s):
 def _unpackb(read_fn):
     code = read_fn(1)
     return _unpack_dispatch_table[code](code, read_fn)
-
-
-if _IS_PY3:
-    _byte_type = bytes
-    def _as_bytes(b):
-        if b.__class__ == str:
-            return b.encode('utf-8')
-        return b
-
-else:
-    _byte_type = str
-    
-    def _as_bytes(b):
-        if b.__class__ == unicode:
-            return b.encode('utf-8')
-        return b
 
 
 def unpackb(s):
