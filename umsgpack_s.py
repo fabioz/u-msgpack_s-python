@@ -86,10 +86,10 @@ class Ext:
                 Specified ext type is outside of 0 to 127 range.
 
         Example:
-        >>> foo = umsgpack.Ext(0x05, b"\x01\x02\x03")
-        >>> umsgpack.packb({u"special stuff": foo, u"awesome": True})
+        >>> foo = umsgpack_s.Ext(0x05, b"\x01\x02\x03")
+        >>> umsgpack_s.packb({u"special stuff": foo, u"awesome": True})
         '\x82\xa7awesome\xc3\xadspecial stuff\xc7\x03\x05\x01\x02\x03'
-        >>> bar = umsgpack.unpackb(_)
+        >>> bar = umsgpack_s.unpackb(_)
         >>> print(bar["special stuff"])
         Ext Object (Type: 0x05, Data: 01 02 03)
         >>>
@@ -412,7 +412,7 @@ def packb(x):
             Object type not supported for packing.
 
     Example:
-    >>> umsgpack._packb({u"compact": True, u"schema": 0})
+    >>> umsgpack_s._packb({u"compact": True, u"schema": 0})
     '\x82\xa7compact\xc3\xa6schema\x00'
     >>>
     """
@@ -596,7 +596,7 @@ def _unpackb(read_fn):
 
 if _IS_PY3:
     _byte_type = bytes
-    def as_bytes(b):
+    def _as_bytes(b):
         if b.__class__ == str:
             return b.encode('utf-8')
         return b
@@ -604,7 +604,7 @@ if _IS_PY3:
 else:
     _byte_type = str
     
-    def as_bytes(b):
+    def _as_bytes(b):
         if b.__class__ == unicode:
             return b.encode('utf-8')
         return b
@@ -636,7 +636,7 @@ def unpackb(s):
             Duplicate key encountered during map unpacking.
 
     Example:
-    >>> umsgpack.unpackb(b'\x82\xa7compact\xc3\xa6schema\x00')
+    >>> umsgpack_s.unpackb(b'\x82\xa7compact\xc3\xa6schema\x00')
     {u'compact': True, u'schema': 0}
     >>>
     """

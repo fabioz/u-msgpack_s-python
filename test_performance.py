@@ -140,15 +140,15 @@ def test_pack_single():
             self.times['check_unpack_big_arr'] = timeit.timeit(self.check_unpack_big_arr, number=1000)
 
     try:
-        import _original_umsgpack
+        import _original_umsgpack_s
     except:
-        sys.stderr.write('_original_umsgpack must be available with the old version of the code.\n')
+        sys.stderr.write('_original_umsgpack_s must be available with the old version of the code.\n')
         return
-    checker_original = Checker(_original_umsgpack)
+    checker_original = Checker(_original_umsgpack_s)
     checker_original.check_all()
 
-    import umsgpack
-    checker_new = Checker(umsgpack)
+    import umsgpack_s
+    checker_new = Checker(umsgpack_s)
     checker_new.check_all()
 
 

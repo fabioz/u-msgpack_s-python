@@ -4,8 +4,8 @@
 '''
 import unittest
 
-from umsgpack_conn import ConnectionHandler, assert_waited_condition
-import umsgpack_conn
+from umsgpack_s_conn import ConnectionHandler, assert_waited_condition
+import umsgpack_s_conn
 import time
 import threading
 
@@ -44,11 +44,11 @@ class Test(unittest.TestCase):
 
         initial_num_threads = self._list_threads()
 
-        server = umsgpack_conn.Server(ServerHandler)
+        server = umsgpack_s_conn.Server(ServerHandler)
         server.serve_forever('127.0.0.1', 0, block=False)
         port = server.get_port()
 
-        client = umsgpack_conn.Client('127.0.0.1', port, ClientHandler)
+        client = umsgpack_s_conn.Client('127.0.0.1', port, ClientHandler)
 
         assert_waited_condition(lambda: len(server_handlers) == 1)
 

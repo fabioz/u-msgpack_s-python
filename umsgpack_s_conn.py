@@ -1,5 +1,5 @@
 '''
-This module provides a way to do full-duplex communication over a socket with umsgpack.
+This module provides a way to do full-duplex communication over a socket with umsgpack_s.
 
 
 Basic usage is:
@@ -21,7 +21,7 @@ Basic usage is:
 
 
     # Start the server
-    server = umsgpack_conn.Server(ServerHandler)
+    server = umsgpack_s_conn.Server(ServerHandler)
     server.serve_forever('127.0.0.1', 0, block=True)
     port = server.get_port() # Port only available after socket is created
 
@@ -34,7 +34,7 @@ Basic usage is:
         def _handle_decoded(self, decoded):
             print('Client received: %s' % (decoded,))
 
-    client = umsgpack_conn.Client('127.0.0.1', port, ClientHandler)
+    client = umsgpack_s_conn.Client('127.0.0.1', port, ClientHandler)
 
     # Note, as above, actual implementations may want to put that in a queue and have an additional
     # thread do the actual send.
@@ -58,8 +58,8 @@ try:
 except:
     basestring = str
 
-import umsgpack
-as_bytes = umsgpack.as_bytes
+import umsgpack_s
+_as_bytes = umsgpack_s._as_bytes
 DEBUG = 0  # > 3 to see actual messages
 BUFFER_SIZE = 1024 * 8
 MAX_INT32 = 2147483647  # ((2** 32) -1)
@@ -262,13 +262,13 @@ class UMsgPacker(object):
 
     def pack_obj(self, obj):
         '''
-        Mostly packs the object with umsgpack then adds the size (in bytes) to the front of the msg
+        Mostly packs the object with umsgpack_s then adds the size (in bytes) to the front of the msg
         and returns it to be passed on the socket..
 
         :param object obj:
             The object to be packed.
         '''
-        msg = umsgpack.packb(obj)
+        msg = umsgpack_s.packb(obj)
         assert msg.__len__() < MAX_INT32, 'Message from object received is too big: %s bytes' % (
             msg.__len__(),)
         msg_len_in_bytes = struct.pack("<I", msg.__len__())
@@ -307,7 +307,7 @@ class ConnectionHandler(threading.Thread, UMsgPacker):
             pass
 
     def run(self):
-        data = as_bytes('')
+        data = _as_bytes('')
         number_of_bytes = 0
         try:
             while True:
@@ -370,7 +370,7 @@ class ConnectionHandler(threading.Thread, UMsgPacker):
     def _handle_msg(self, msg_as_bytes):
         if DEBUG > 3:
             sys.stderr.write('%s handling message: %s\n' % (self, binascii.b2a_hex(msg_as_bytes)))
-        decoded = umsgpack.unpackb(msg_as_bytes)
+        decoded = umsgpack_s.unpackb(msg_as_bytes)
         self._handle_decoded(decoded)
 
     def _handle_decoded(self, decoded):
