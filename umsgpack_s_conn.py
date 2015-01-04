@@ -209,7 +209,10 @@ class Server(object):
                     break
 
                 # Will block until available (no timeout). If closed returns properly.
-                fd_sets = select.select([sock], [], [])
+                try:
+                    fd_sets = select.select([sock], [], [])
+                except:
+                    break  # error: (9, 'Bad file descriptor')
                 if DEBUG:
                     sys.stderr.write('Select returned: %s\n' % fd_sets[0])
 
