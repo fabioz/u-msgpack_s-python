@@ -13,8 +13,7 @@ import threading
 class Test(unittest.TestCase):
 
 
-    def test_conn(self):
-
+    def _setup(self):
         server_received = []
         server_handlers = []
 
@@ -41,7 +40,13 @@ class Test(unittest.TestCase):
 
             def _handle_decoded(self, decoded):
                 client_received.append(decoded)
+                
+        return ServerHandler, ClientHandler, server_handlers, server_received, client_received
 
+    def test_conn(self):
+        ServerHandler, ClientHandler, server_handlers, server_received, client_received = \
+            self._setup()
+            
         initial_num_threads = self._list_threads()
 
         server = umsgpack_s_conn.Server(ServerHandler)
@@ -49,6 +54,9 @@ class Test(unittest.TestCase):
         port = server.get_port()
 
         client = umsgpack_s_conn.Client('127.0.0.1', port, ClientHandler)
+        host, port = client.get_host_port()
+        self.assertEqual(host, '127.0.0.1')
+        self.assert_(port > 0)
 
         assert_waited_condition(lambda: len(server_handlers) == 1)
 
@@ -77,6 +85,40 @@ class Test(unittest.TestCase):
 
         assert_waited_condition(lambda: self._list_threads() == initial_num_threads)
 
+        self.assertEqual(client.get_host_port(), (None, None))
+        
+    def test_close_conn_on_client_side(self):
+        ServerHandler, ClientHandler, server_handlers, server_received, client_received = \
+            self._setup()
+        initial_num_threads = self._list_threads()
+
+        server = umsgpack_s_conn.Server(ServerHandler)
+        server.serve_forever('127.0.0.1', 0, block=False)
+        port = server.get_port()
+
+        client = umsgpack_s_conn.Client('127.0.0.1', port, ClientHandler)
+        host, port = client.get_host_port()
+        assert port > 0
+        assert server.is_alive()
+        assert client.is_alive()
+        
+        assert_waited_condition(lambda: self._list_threads() == initial_num_threads + 3)
+        client.shutdown()
+        assert_waited_condition(lambda: self._list_threads() == initial_num_threads + 1)
+        assert not client.is_alive()
+        assert server.is_alive()
+        send = [1234, 'ab'] * 8192
+        try:
+            server_handlers[0].send(send)
+        except:
+            pass
+        else:
+            raise AssertionError('Expected send to fail since it is now closed.')
+        
+        assert_waited_condition(lambda: self._list_threads() == initial_num_threads + 1)
+        server.shutdown()
+        assert_waited_condition(lambda: not server.is_alive())
+        assert_waited_condition(lambda: self._list_threads() == initial_num_threads)
 
     def _list_threads(self, print_=False):
         total_threads = 0

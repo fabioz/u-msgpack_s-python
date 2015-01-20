@@ -231,8 +231,7 @@ class Server(object):
                     try:
                         connection_handler = self.connection_handler_class(
                             connection,
-                            *
-                            self._params)
+                            *self._params)
                         connections.append(weakref.ref(connection))
                         connection_handler.start()
                     except:
@@ -293,10 +292,39 @@ class Client(UMsgPacker):
         if connection_handler_class:
             connection_handler = self.connection_handler = connection_handler_class(self._sock)
             connection_handler.start()
+            
+    def get_host_port(self):
+        try:
+            return self._sock.getsockname()
+        except:
+            return None, None
+        
+    def is_alive(self):
+        try:
+            self._sock.getsockname()
+            return True
+        except:
+            return False
 
     def send(self, obj):
+        s = self._sock
+        if s is None:
+            raise RuntimeError('Connection already closed')
         self._sock.sendall(self.pack_obj(obj))
-
+        
+    def shutdown(self):
+        s = self._sock
+        if self._sock is None:
+            return
+        self._sock = None
+        try:
+            s.shutdown(socket.SHUT_RDWR)
+        except:
+            pass
+        try:
+            s.close()
+        except:
+            pass
 
 class ConnectionHandler(threading.Thread, UMsgPacker):
 
