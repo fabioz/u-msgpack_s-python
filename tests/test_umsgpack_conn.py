@@ -2,12 +2,12 @@
 @license: MIT
 @author: Fabio Zadrozny
 '''
+import threading
+import time
 import unittest
 
 from umsgpack_s_conn import ConnectionHandler, assert_waited_condition
 import umsgpack_s_conn
-import time
-import threading
 
 
 class Test(unittest.TestCase):
@@ -87,6 +87,83 @@ class Test(unittest.TestCase):
 
         self.assertEqual(client.get_host_port(), (None, None))
         
+    def test_big_message(self):
+        from umsgpack_s_conn import BUFFER_SIZE
+        ServerHandler, ClientHandler, server_handlers, server_received, client_received = \
+            self._setup()
+
+        initial_num_threads = self._list_threads()
+
+        server = umsgpack_s_conn.Server(ServerHandler)
+        server.serve_forever('127.0.0.1', 0, block=False)
+        port = server.get_port()
+
+        client = umsgpack_s_conn.Client('127.0.0.1', port, ClientHandler)
+        host, port = client.get_host_port()
+        self.assertEqual(host, '127.0.0.1')
+        self.assert_(port > 0)
+
+        assert_waited_condition(lambda: len(server_handlers) == 1)
+
+        assert_waited_condition(lambda: self._list_threads() == initial_num_threads + 3)
+
+        big_message = b'abc' * (BUFFER_SIZE * 20)
+        client.send(big_message)
+        assert_waited_condition(lambda: len(server_received) > 0)
+        self.assertEqual([big_message], server_received)
+        del server_received[:]
+
+        server_handlers[0].send(big_message)
+        assert_waited_condition(lambda: len(client_received) > 0)
+        self.assertEqual([big_message], client_received)
+        del client_received[:]
+
+        server.shutdown()
+        assert_waited_condition(lambda: not server.is_alive())
+
+        assert_waited_condition(lambda: self._list_threads() == initial_num_threads)
+
+        self.assertEqual(client.get_host_port(), (None, None))
+
+    def test_client_exit_gracefully_on_finish_exception(self):
+        from umsgpack_s_conn import FinishException
+        ServerHandler, ClientHandler, server_handlers, server_received, client_received = \
+            self._setup()
+
+        initial_num_threads = self._list_threads()
+
+        server = umsgpack_s_conn.Server(ServerHandler)
+        server.serve_forever('127.0.0.1', 0, block=False)
+        port = server.get_port()
+
+        class CustomClient(ClientHandler):
+
+            def _handle_decoded(self, decoded):
+                ClientHandler._handle_decoded(self, decoded)
+                if decoded == b'exit':
+                    raise FinishException()
+                raise RuntimeError('Expected exit message.')
+
+        client = umsgpack_s_conn.Client('127.0.0.1', port, CustomClient)
+        host, port = client.get_host_port()
+        self.assertEqual(host, '127.0.0.1')
+        self.assert_(port > 0)
+
+        assert_waited_condition(lambda: len(server_handlers) == 1)
+        assert_waited_condition(lambda: self._list_threads() == initial_num_threads + 3)
+
+        server_handlers[0].send(b'exit')
+        assert_waited_condition(lambda: len(client_received) > 0)
+        # Exit with exit message.
+        assert_waited_condition(lambda: not client.is_alive())
+
+        server.shutdown()
+        assert_waited_condition(lambda: not server.is_alive())
+
+        assert_waited_condition(lambda: self._list_threads() == initial_num_threads)
+
+        self.assertEqual(client.get_host_port(), (None, None))
+
     def test_close_conn_on_client_side(self):
         ServerHandler, ClientHandler, server_handlers, server_received, client_received = \
             self._setup()

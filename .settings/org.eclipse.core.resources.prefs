@@ -1,4 +1,4 @@
 eclipse.preferences.version=1
 encoding//.settings/org.python.pydev.yaml=UTF-8
-encoding/test_performance.py=utf-8
-encoding/test_umsgpack.py=utf-8
+encoding//tests/test_performance.py=utf-8
+encoding//tests/test_umsgpack.py=utf-8

@@ -326,6 +326,9 @@ class Client(UMsgPacker):
         except:
             pass
 
+class FinishException(Exception):
+    pass
+
 class ConnectionHandler(threading.Thread, UMsgPacker):
 
     def __init__(self, connection, **kwargs):
@@ -387,6 +390,9 @@ class ConnectionHandler(threading.Thread, UMsgPacker):
                 data = data[number_of_bytes:]  # Keep the remaining for the next message
                 number_of_bytes = 0
                 self._handle_msg(msg)
+
+        except FinishException:
+            pass  # Handle and exit gracefully.
 
         finally:
             try:
