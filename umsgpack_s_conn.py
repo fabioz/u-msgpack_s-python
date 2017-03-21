@@ -271,9 +271,9 @@ class UMsgPacker(object):
             The object to be packed.
         '''
         msg = umsgpack_s.packb(obj)
-        assert msg.__len__() < MAX_INT32, 'Message from object received is too big: %s bytes' % (
-            msg.__len__(),)
-        msg_len_in_bytes = struct.pack("<I", msg.__len__())
+        assert len(msg) < MAX_INT32, 'Message from object received is too big: %s bytes' % (
+            len(msg),)
+        msg_len_in_bytes = struct.pack("<I", len(msg))
         return(msg_len_in_bytes + msg)
 
 
@@ -347,14 +347,14 @@ class ConnectionHandler(threading.Thread, UMsgPacker):
             while True:
                 # I.e.: check if the remaining bytes from our last recv already contained
                 # a new message.
-                if number_of_bytes == 0 and data.__len__() >= 4:
+                if number_of_bytes == 0 and len(data) >= 4:
                     number_of_bytes = data[
                         :4]  # first 4 bytes say the number_of_bytes of the message
                     number_of_bytes = struct.unpack("<I", number_of_bytes)[0]
                     assert number_of_bytes >= 0, 'Error: wrong message received. Shutting down connection!'
                     data = data[4:]  # The remaining is the actual data
 
-                while not data or number_of_bytes == 0 or data.__len__() < number_of_bytes:
+                while not data or number_of_bytes == 0 or len(data) < number_of_bytes:
 
                     if DEBUG > 3:
                         sys.stderr.write('%s waiting to receive.\n' % (self,))
@@ -376,7 +376,11 @@ class ConnectionHandler(threading.Thread, UMsgPacker):
                         sys.stderr.write('%s received: %s\n' % (self, binascii.b2a_hex(rec)))
 
                     data += rec
-                    if not number_of_bytes and data.__len__() >= 4:
+                    if DEBUG > 2:
+                        if number_of_bytes > 0:
+                            print('Received: %.2f%% (%s of %s)' % (len(data) / float(number_of_bytes) * 100., len(data), number_of_bytes))
+
+                    if not number_of_bytes and len(data) >= 4:
                         number_of_bytes = data[
                             :4]  # first 4 bytes say the number_of_bytes of the message
                         number_of_bytes = struct.unpack("<I", number_of_bytes)[0]
@@ -384,7 +388,7 @@ class ConnectionHandler(threading.Thread, UMsgPacker):
                         data = data[4:]  # The remaining is the actual data
                         if DEBUG:
                             sys.stderr.write('Number of bytes expected: %s\n' % number_of_bytes)
-                            sys.stderr.write('Current data len: %s\n' % data.__len__())
+                            sys.stderr.write('Current data len: %s\n' % len(data))
 
                 msg = data[:number_of_bytes]
                 data = data[number_of_bytes:]  # Keep the remaining for the next message
