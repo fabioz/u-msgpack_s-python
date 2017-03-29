@@ -334,6 +334,8 @@ class ConnectionHandler(threading.Thread, UMsgPacker):
     def __init__(self, connection, **kwargs):
         threading.Thread.__init__(self, **kwargs)
         self.setDaemon(True)
+        self.time_to_receive_last_message = 0
+        self.time_to_unpack_last_message = 0
         self.connection = connection
         try:
             connection.settimeout(None)  # No timeout
@@ -344,6 +346,7 @@ class ConnectionHandler(threading.Thread, UMsgPacker):
         data = _as_bytes('')
         number_of_bytes = 0
         try:
+            initial_receive_time = time.time()
             while True:
                 # I.e.: check if the remaining bytes from our last recv already contained
                 # a new message.
@@ -354,6 +357,7 @@ class ConnectionHandler(threading.Thread, UMsgPacker):
                     assert number_of_bytes >= 0, 'Error: wrong message received. Shutting down connection!'
                     data = data[4:]  # The remaining is the actual data
 
+                initial_receive_time = time.time()
                 while not data or number_of_bytes == 0 or len(data) < number_of_bytes:
 
                     if DEBUG > 3:
@@ -392,6 +396,7 @@ class ConnectionHandler(threading.Thread, UMsgPacker):
 
                 msg = data[:number_of_bytes]
                 data = data[number_of_bytes:]  # Keep the remaining for the next message
+                self.time_to_receive_last_message = time.time() - initial_receive_time
                 number_of_bytes = 0
                 self._handle_msg(msg)
 
@@ -411,7 +416,9 @@ class ConnectionHandler(threading.Thread, UMsgPacker):
     def _handle_msg(self, msg_as_bytes):
         if DEBUG > 3:
             sys.stderr.write('%s handling message: %s\n' % (self, binascii.b2a_hex(msg_as_bytes)))
+        initial_time = time.time()
         decoded = umsgpack_s.unpackb(msg_as_bytes)
+        self.time_to_unpack_last_message = time.time() - initial_time
         self._handle_decoded(decoded)
 
     def _handle_decoded(self, decoded):
