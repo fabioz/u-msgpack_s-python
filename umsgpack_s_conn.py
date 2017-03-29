@@ -357,7 +357,6 @@ class ConnectionHandler(threading.Thread, UMsgPacker):
                     assert number_of_bytes >= 0, 'Error: wrong message received. Shutting down connection!'
                     data = data[4:]  # The remaining is the actual data
 
-                initial_receive_time = time.time()
                 while not data or number_of_bytes == 0 or len(data) < number_of_bytes:
 
                     if DEBUG > 3:
@@ -371,6 +370,8 @@ class ConnectionHandler(threading.Thread, UMsgPacker):
                             if DEBUG:
                                 sys.stderr.write('Disconnected (socket closed).\n')
                             return
+                        if not data:
+                            initial_receive_time = time.time()
                     except:
                         if DEBUG:
                             sys.stderr.write('Disconnected.\n')
@@ -399,6 +400,7 @@ class ConnectionHandler(threading.Thread, UMsgPacker):
                 self.time_to_receive_last_message = time.time() - initial_receive_time
                 number_of_bytes = 0
                 self._handle_msg(msg)
+                initial_receive_time = time.time()
 
         except FinishException:
             pass  # Handle and exit gracefully.
