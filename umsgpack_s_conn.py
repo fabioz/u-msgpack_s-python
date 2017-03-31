@@ -63,6 +63,7 @@ _as_bytes = umsgpack_s._as_bytes
 DEBUG = 0  # > 3 to see actual messages
 BUFFER_SIZE = 1024 * 8
 MAX_INT32 = 2147483647  # ((2** 32) -1)
+SHOW_PROGRESS = False
 
 
 def get_free_port():
@@ -346,6 +347,7 @@ class ConnectionHandler(threading.Thread, UMsgPacker):
         data_lst = []
         data_lst_bytes_len = 0
         number_of_bytes = 0
+        last_progress_print_time = 0
         try:
             initial_receive_time = time.time()
             while True:
@@ -407,9 +409,13 @@ class ConnectionHandler(threading.Thread, UMsgPacker):
                             sys.stderr.write('Number of bytes expected: %s\n' % number_of_bytes)
                             sys.stderr.write('Current data len: %s\n' % data_lst_bytes_len)
 
-                    if DEBUG > 2:
+                    if SHOW_PROGRESS:
                         if number_of_bytes > 0:
-                            print('Received: %.2f%% (%s of %s)' % (data_lst_bytes_len / float(number_of_bytes) * 100., data_lst_bytes_len, number_of_bytes))
+                            curr_time = time.time()
+                            if curr_time - last_progress_print_time > 2:
+                                # At most 1 print every 2 seconds
+                                print('Received: %.2f%% (%s of %s)' % (data_lst_bytes_len / float(number_of_bytes) * 100., data_lst_bytes_len, number_of_bytes))
+                                last_progress_print_time = curr_time
 
                 d = _as_bytes('').join(data_lst)
                 msg = d[:number_of_bytes]
