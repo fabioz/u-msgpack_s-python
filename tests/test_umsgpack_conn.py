@@ -107,7 +107,7 @@ class Test(unittest.TestCase):
 
         assert_waited_condition(lambda: self._list_threads() == initial_num_threads + 3)
 
-        big_message = b'abc' * (BUFFER_SIZE * 20)
+        big_message = b'abc' * (int(BUFFER_SIZE * 20.33))
         client.send(big_message)
         assert_waited_condition(lambda: len(server_received) > 0)
         self.assertEqual([big_message], server_received)
@@ -116,6 +116,46 @@ class Test(unittest.TestCase):
         server_handlers[0].send(big_message)
         assert_waited_condition(lambda: len(client_received) > 0)
         self.assertEqual([big_message], client_received)
+        del client_received[:]
+
+        server.shutdown()
+        assert_waited_condition(lambda: not server.is_alive())
+
+        assert_waited_condition(lambda: self._list_threads() == initial_num_threads)
+
+        self.assertEqual(client.get_host_port(), (None, None))
+
+    def test_small_message(self):
+        ServerHandler, ClientHandler, server_handlers, server_received, client_received = \
+            self._setup()
+
+        initial_num_threads = self._list_threads()
+
+        server = umsgpack_s_conn.Server(ServerHandler)
+        server.serve_forever('127.0.0.1', 0, block=False)
+        port = server.get_port()
+
+        client = umsgpack_s_conn.Client('127.0.0.1', port, ClientHandler)
+        host, port = client.get_host_port()
+        self.assertEqual(host, '127.0.0.1')
+        self.assert_(port > 0)
+
+        assert_waited_condition(lambda: len(server_handlers) == 1)
+
+        assert_waited_condition(lambda: self._list_threads() == initial_num_threads + 3)
+
+        small_message = b'abc'
+        for _i in range(30):
+            client.send(small_message)
+
+        assert_waited_condition(lambda: len(server_received) == 30)
+        self.assertEqual([small_message] * 30, server_received)
+        del server_received[:]
+
+        for _i in range(30):
+            server_handlers[0].send(small_message)
+        assert_waited_condition(lambda: len(client_received) == 30)
+        self.assertEqual([small_message] * 30, client_received)
         del client_received[:]
 
         server.shutdown()

@@ -292,13 +292,13 @@ class Client(UMsgPacker):
         if connection_handler_class:
             connection_handler = self.connection_handler = connection_handler_class(self._sock)
             connection_handler.start()
-            
+
     def get_host_port(self):
         try:
             return self._sock.getsockname()
         except:
             return None, None
-        
+
     def is_alive(self):
         try:
             self._sock.getsockname()
@@ -311,7 +311,7 @@ class Client(UMsgPacker):
         if s is None:
             raise RuntimeError('Connection already closed')
         self._sock.sendall(self.pack_obj(obj))
-        
+
     def shutdown(self):
         s = self._sock
         if self._sock is None:
@@ -343,21 +343,30 @@ class ConnectionHandler(threading.Thread, UMsgPacker):
             pass
 
     def run(self):
-        data = _as_bytes('')
+        data_lst = []
+        data_lst_bytes_len = 0
         number_of_bytes = 0
         try:
             initial_receive_time = time.time()
             while True:
                 # I.e.: check if the remaining bytes from our last recv already contained
                 # a new message.
-                if number_of_bytes == 0 and len(data) >= 4:
-                    number_of_bytes = data[
-                        :4]  # first 4 bytes say the number_of_bytes of the message
+                if number_of_bytes == 0 and data_lst_bytes_len >= 4:
+                    d = _as_bytes('').join(data_lst)
+                    number_of_bytes = d[:4]  # first 4 bytes say the number_of_bytes of the message
+
+                    data_lst_bytes_len -= 4
+                    data_lst = []
+
                     number_of_bytes = struct.unpack("<I", number_of_bytes)[0]
                     assert number_of_bytes >= 0, 'Error: wrong message received. Shutting down connection!'
-                    data = data[4:]  # The remaining is the actual data
+                    d = d[4:]  # The remaining is the actual data
+                    data_lst.append(d)
+                    if DEBUG:
+                        sys.stderr.write('Number of bytes expected: %s\n' % number_of_bytes)
+                        sys.stderr.write('Current data len: %s\n' % data_lst_bytes_len)
 
-                while not data or number_of_bytes == 0 or len(data) < number_of_bytes:
+                while not data_lst_bytes_len or number_of_bytes == 0 or data_lst_bytes_len < number_of_bytes:
 
                     if DEBUG > 3:
                         sys.stderr.write('%s waiting to receive.\n' % (self,))
@@ -370,7 +379,7 @@ class ConnectionHandler(threading.Thread, UMsgPacker):
                             if DEBUG:
                                 sys.stderr.write('Disconnected (socket closed).\n')
                             return
-                        if not data:
+                        if not data_lst_bytes_len:
                             initial_receive_time = time.time()
                     except:
                         if DEBUG:
@@ -380,23 +389,34 @@ class ConnectionHandler(threading.Thread, UMsgPacker):
                     if DEBUG > 3:
                         sys.stderr.write('%s received: %s\n' % (self, binascii.b2a_hex(rec)))
 
-                    data += rec
-                    if DEBUG > 2:
-                        if number_of_bytes > 0:
-                            print('Received: %.2f%% (%s of %s)' % (len(data) / float(number_of_bytes) * 100., len(data), number_of_bytes))
+                    data_lst_bytes_len += len(rec)
+                    data_lst.append(rec)
 
-                    if not number_of_bytes and len(data) >= 4:
-                        number_of_bytes = data[
-                            :4]  # first 4 bytes say the number_of_bytes of the message
+                    if not number_of_bytes and data_lst_bytes_len >= 4:
+                        d = _as_bytes('').join(data_lst)
+                        number_of_bytes = d[:4]  # first 4 bytes say the number_of_bytes of the message
+
+                        data_lst_bytes_len -= 4
+                        data_lst = []
+
                         number_of_bytes = struct.unpack("<I", number_of_bytes)[0]
                         assert number_of_bytes >= 0, 'Error: wrong message received. Shutting down connection!'
-                        data = data[4:]  # The remaining is the actual data
+                        d = d[4:]  # The remaining is the actual data
+                        data_lst.append(d)
                         if DEBUG:
                             sys.stderr.write('Number of bytes expected: %s\n' % number_of_bytes)
-                            sys.stderr.write('Current data len: %s\n' % len(data))
+                            sys.stderr.write('Current data len: %s\n' % data_lst_bytes_len)
 
-                msg = data[:number_of_bytes]
-                data = data[number_of_bytes:]  # Keep the remaining for the next message
+                    if DEBUG > 2:
+                        if number_of_bytes > 0:
+                            print('Received: %.2f%% (%s of %s)' % (data_lst_bytes_len / float(number_of_bytes) * 100., data_lst_bytes_len, number_of_bytes))
+
+                d = _as_bytes('').join(data_lst)
+                msg = d[:number_of_bytes]
+                d = d[number_of_bytes:]  # Keep the remaining for the next message
+                data_lst = [d]
+                data_lst_bytes_len = len(d)
+
                 self.time_to_receive_last_message = time.time() - initial_receive_time
                 number_of_bytes = 0
                 self._handle_msg(msg)
