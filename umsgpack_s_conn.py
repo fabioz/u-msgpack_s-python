@@ -146,9 +146,9 @@ class Server(object):
                 'Server already started. Please create new one instead of trying to reuse.')
         if not block:
             self.thread = self._thread_class(target=self._serve_forever, args=(host, port))
-            self.thread.setDaemon(True)
+            self.thread.daemon = True
             if self._thread_name:
-                self.thread.setName(self._thread_name)
+                self.thread.name = self._thread_name
             self.thread.start()
         else:
             self._serve_forever(host, port)
@@ -334,7 +334,7 @@ class ConnectionHandler(threading.Thread, UMsgPacker):
 
     def __init__(self, connection, **kwargs):
         threading.Thread.__init__(self, **kwargs)
-        self.setDaemon(True)
+        self.daemon = True
         self.time_to_receive_last_message = 0
         self.time_to_unpack_last_message = 0
         self.connection = connection
